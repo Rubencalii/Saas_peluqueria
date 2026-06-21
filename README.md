@@ -37,6 +37,7 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Informes: `GET /api/v1/admin/reports/{occupancy,no-shows,bookings-by-channel}`
   - Probado de extremo a extremo vía curl
 - ✅ Motor de notificaciones y recordatorios (doc 07): al crear/cambiar/cancelar una cita se programan automáticamente confirmación, recordatorio (24 h antes) y avisos de cambio/cancelación en la tabla `notification`. El comando `php bin/console app:notifications:dispatch` (para cron) entrega las vencidas por WhatsApp y marca `enviada`/`fallida`. Probado de extremo a extremo (con/sin consentimiento, cancelación, recordatorio futuro)
+- ✅ Suite de tests automatizados (PHPUnit, doc 10): 23 tests sobre la lógica crítica — disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, JWT/roles y redacción de notificaciones. Integración contra BD de test aislada con rollback por transacción
 
 ### Pendiente
 
@@ -55,6 +56,33 @@ docker compose up -d
 ```
 
 Detalles, conexión y pruebas: ver [`db/README.md`](db/README.md).
+
+## Pruebas (backend)
+
+La suite usa PHPUnit. Los tests de integración corren contra una base de datos
+de test aislada (`peluqueria_test`) en el mismo Postgres de Docker; cada test
+se ejecuta dentro de una transacción que se revierte, así que no deja rastro.
+
+Preparar la BD de test una vez (carga esquema + datos de demo):
+
+```bash
+docker compose exec -T db psql -U peluqueria -d peluqueria -c "CREATE DATABASE peluqueria_test;"
+for f in db/migrations/0001_init.sql db/migrations/0002_overlap_protection.sql \
+         db/migrations/0003_idempotency.sql db/migrations/0004_appointment_public_code.sql \
+         db/migrations/0005_whatsapp_conversation.sql db/seed.sql; do
+  docker compose exec -T db psql -U peluqueria -d peluqueria_test -q < "$f"
+done
+```
+
+Ejecutar la suite:
+
+```bash
+cd backend && php bin/phpunit
+```
+
+Cubre la lógica crítica: disponibilidad y tiempos muertos, condición de carrera
+(409 al solapar), idempotencia, rollback de reprogramación, JWT/roles y la
+redacción de notificaciones.
 
 ## Documentación
 
