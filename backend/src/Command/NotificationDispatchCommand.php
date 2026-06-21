@@ -53,7 +53,7 @@ final class NotificationDispatchCommand extends Command
         $dryRun = (bool) $input->getOption('dry-run');
 
         $due = $this->db->fetchAllAssociative(
-            "SELECT n.id, n.type, a.status AS appointment_status, a.start_at,
+            "SELECT n.id, n.type, n.template_name, a.status AS appointment_status, a.start_at,
                     c.name, c.phone, c.wa_consent,
                     s.name AS service_name, l.name AS location_name, l.timezone
                FROM notification n
@@ -93,6 +93,7 @@ final class NotificationDispatchCommand extends Command
 
             $body = $this->notifications->render([
                 'type' => $type,
+                'template' => $n['template_name'] !== null ? (string) $n['template_name'] : '',
                 'status' => (string) $n['appointment_status'],
                 'name' => (string) $n['name'],
                 'location_name' => (string) $n['location_name'],

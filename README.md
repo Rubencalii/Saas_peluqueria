@@ -42,11 +42,16 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
 
 - ✅ IA conversacional en el bot de WhatsApp (decisión doc 00): capa de comprensión de lenguaje natural con Claude (SDK oficial, salida estructurada) que deduce intención + servicio/profesional/fecha de un mensaje libre ("quiero un corte mañana con Laura") y arranca el flujo de reserva ya existente. Se desactiva sin `ANTHROPIC_API_KEY` (el bot funciona solo con botones). Modelo configurable con `ANTHROPIC_MODEL` (por defecto `claude-opus-4-8`)
 
+- ✅ Features del backlog (doc 13):
+  - Recordatorio de retorno "te toca volver" (§2.3): comando `app:notifications:return-reminders --weeks=N` (cron) que avisa a clientes que no vuelven hace ~N semanas, reutilizando el motor de notificaciones (con consentimiento, idempotente)
+  - Informes avanzados (§2.8): `GET /api/v1/admin/reports/{revenue,peak-hours,retention}` — ingresos por profesional/servicio, horas punta y tasa de retención
+  - Anti no-show (§2.2): `GET /api/v1/admin/reports/no-show-customers` — ranking de clientes con más ausencias
+
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
-- ⏳ Features de producto del backlog (doc 13): anti no-show, lista de espera, pago/depósito, etc.
+- ⏳ Backlog restante (doc 13): lista de espera, pago/depósito online, sync calendario
 
 ## Arranque rápido (base de datos)
 

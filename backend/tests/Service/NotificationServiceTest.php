@@ -73,6 +73,19 @@ final class NotificationServiceTest extends KernelTestCase
         self::assertStringContainsString('cancelada', $text);
     }
 
+    public function testRecordatorioRetornoUsaPlantillaMarketing(): void
+    {
+        $ctx = $this->ctx('seguimiento', 'completada');
+        $ctx['template'] = 'recordatorio_retorno';
+        $text = $this->service->render($ctx);
+
+        self::assertStringContainsString('Lucía', $text);
+        self::assertStringContainsString('Salón Centro', $text);
+        self::assertStringContainsString('menú', $text);
+        // No debe colarse el texto del seguimiento estándar ("¿Qué tal la experiencia").
+        self::assertStringNotContainsString('experiencia', $text);
+    }
+
     public function testHoraSeMuestraEnZonaLocalNoUtc(): void
     {
         // 08:30 UTC nunca debe aparecer como tal: el cliente ve su hora local.

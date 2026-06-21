@@ -160,19 +160,200 @@ final class AdminReportsController extends AdminController
     }
 
     /**
-     * Filtro común para no-shows/canales: por rango (UTC) y, si procede, sede.
+     * Ingresos (doc 13 §2.8): por profesional y por servicio en el rango. Solo
+     * citas completadas; el precio sale de service_location.price_override o, en
+     * su defecto, service.price.
+     */
+    #[Route('/api/v1/admin/reports/revenue', name: 'admin_report_revenue', methods: ['GET'])]
+    public function revenue(Request $request): JsonResponse
+    {
+        $ctx = $this->context($request, requireLocation: false);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
+        [$locationId, $from, $to] = $ctx;
+        [$where, $params] = $this->scope($locationId, $from, $to, 'a');
+        $where .= " AND a.status = 'completada'";
+
+        $price = 'COALESCE(sl.price_override, s.price)';
+        $join = 'FROM appointment a
+                   JOIN service s ON s.id = a.service_id
+                   LEFT JOIN service_location sl ON sl.service_id = a.service_id AND sl.location_id = a.location_id';
+
+        $byStaff = $this->db->fetchAllAssociative(
+            "SELECT a.staff_id, st.name AS staff_name, COUNT(*) AS appts,
+                    COALESCE(SUM($price), 0) AS revenue
+               $join LEFT JOIN staff st ON st.id = a.staff_id
+              WHERE $where GROUP BY a.staff_id, st.name ORDER BY revenue DESC",
+            $params
+        );
+        $byService = $this->db->fetchAllAssociative(
+            "SELECT a.service_id, s.name AS service_name, COUNT(*) AS appts,
+                    COALESCE(SUM($price), 0) AS revenue
+               $join WHERE $where GROUP BY a.service_id, s.name ORDER BY revenue DESC",
+            $params
+        );
+        $total = (float) $this->db->fetchOne("SELECT COALESCE(SUM($price), 0) $join WHERE $where", $params);
+
+        return $this->json([
+            'location_id' => $locationId,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->modify('-1 day')->format('Y-m-d'),
+            'total_revenue' => round($total, 2),
+            'by_staff' => array_map(static fn (array $r): array => [
+                'staff_id' => $r['staff_id'] !== null ? (int) $r['staff_id'] : null,
+                'staff_name' => $r['staff_name'] !== null ? (string) $r['staff_name'] : null,
+                'appointments' => (int) $r['appts'],
+                'revenue' => round((float) $r['revenue'], 2),
+            ], $byStaff),
+            'by_service' => array_map(static fn (array $r): array => [
+                'service_id' => (int) $r['service_id'],
+                'service_name' => (string) $r['service_name'],
+                'appointments' => (int) $r['appts'],
+                'revenue' => round((float) $r['revenue'], 2),
+            ], $byService),
+        ]);
+    }
+
+    /**
+     * Horas punta (doc 13 §2.8): nº de citas por día de la semana y por hora
+     * local. Útil para dimensionar plantilla.
+     */
+    #[Route('/api/v1/admin/reports/peak-hours', name: 'admin_report_peak_hours', methods: ['GET'])]
+    public function peakHours(Request $request): JsonResponse
+    {
+        $ctx = $this->context($request, requireLocation: false);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
+        [$locationId, $from, $to, $tz] = $ctx;
+        [$where, $params] = $this->scope($locationId, $from, $to, 'a');
+        $where .= " AND a.status IN ('confirmada','completada')";
+
+        // weekday 0=lun..6=dom (igual que staff_schedule); hora local de la sede.
+        $local = 'a.start_at AT TIME ZONE ?';
+        $params2 = array_merge([$tz->getName(), $tz->getName()], $params);
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT ((EXTRACT(ISODOW FROM ($local))::int + 6) % 7) AS weekday,
+                    EXTRACT(HOUR FROM ($local))::int AS hour,
+                    COUNT(*) AS total
+               FROM appointment a
+              WHERE $where
+              GROUP BY weekday, hour ORDER BY weekday, hour",
+            $params2
+        );
+
+        return $this->json([
+            'location_id' => $locationId,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->modify('-1 day')->format('Y-m-d'),
+            'timezone' => $tz->getName(),
+            'slots' => array_map(static fn (array $r): array => [
+                'weekday' => (int) $r['weekday'],
+                'hour' => (int) $r['hour'],
+                'appointments' => (int) $r['total'],
+            ], $rows),
+        ]);
+    }
+
+    /**
+     * Retención (doc 13 §2.8): de los clientes con cita en el rango, qué
+     * proporción ha venido más de una vez (histórico completo).
+     */
+    #[Route('/api/v1/admin/reports/retention', name: 'admin_report_retention', methods: ['GET'])]
+    public function retention(Request $request): JsonResponse
+    {
+        $ctx = $this->context($request, requireLocation: false);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
+        [$locationId, $from, $to] = $ctx;
+        [$where, $params] = $this->scope($locationId, $from, $to, 'a');
+        $where .= " AND a.status IN ('confirmada','completada')";
+
+        // Clientes con actividad en el rango y su nº total de visitas (histórico).
+        $row = $this->db->fetchAssociative(
+            "WITH activos AS (
+                SELECT DISTINCT a.customer_id FROM appointment a WHERE $where
+             )
+             SELECT COUNT(*) AS total_clientes,
+                    COUNT(*) FILTER (WHERE visitas > 1) AS recurrentes
+               FROM (
+                 SELECT ac.customer_id,
+                        (SELECT COUNT(*) FROM appointment h
+                          WHERE h.customer_id = ac.customer_id
+                            AND h.status IN ('confirmada','completada')) AS visitas
+                   FROM activos ac
+               ) t",
+            $params
+        );
+
+        $total = (int) ($row['total_clientes'] ?? 0);
+        $recurrentes = (int) ($row['recurrentes'] ?? 0);
+
+        return $this->json([
+            'location_id' => $locationId,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->modify('-1 day')->format('Y-m-d'),
+            'customers' => $total,
+            'returning_customers' => $recurrentes,
+            'retention_rate' => $total > 0 ? round($recurrentes / $total, 4) : null,
+        ]);
+    }
+
+    /**
+     * Clientes con más ausencias (doc 13 §2.2, anti no-show): ranking por nº de
+     * no_show en el rango, para aplicar política (aviso, depósito).
+     */
+    #[Route('/api/v1/admin/reports/no-show-customers', name: 'admin_report_noshow_customers', methods: ['GET'])]
+    public function noShowCustomers(Request $request): JsonResponse
+    {
+        $ctx = $this->context($request, requireLocation: false);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
+        [$locationId, $from, $to] = $ctx;
+        [$where, $params] = $this->scope($locationId, $from, $to, 'a');
+        $where .= " AND a.status = 'no_show'";
+
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT c.id, c.name, c.phone, COUNT(*) AS no_shows
+               FROM appointment a JOIN customer c ON c.id = a.customer_id
+              WHERE $where
+              GROUP BY c.id, c.name, c.phone
+              ORDER BY no_shows DESC, c.name LIMIT 50",
+            $params
+        );
+
+        return $this->json([
+            'location_id' => $locationId,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->modify('-1 day')->format('Y-m-d'),
+            'customers' => array_map(static fn (array $r): array => [
+                'id' => (int) $r['id'],
+                'name' => (string) $r['name'],
+                'phone' => (string) $r['phone'],
+                'no_shows' => (int) $r['no_shows'],
+            ], $rows),
+        ]);
+    }
+
+    /**
+     * Filtro común por rango (UTC) y, si procede, sede. $alias prefija las
+     * columnas cuando la consulta tiene JOINs (p. ej. 'a' → a.start_at).
      *
      * @return array{0: string, 1: list<string|int>}
      */
-    private function scope(?int $locationId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    private function scope(?int $locationId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $alias = ''): array
     {
-        $where = 'start_at >= ? AND start_at < ?';
+        $p = $alias !== '' ? $alias . '.' : '';
+        $where = "{$p}start_at >= ? AND {$p}start_at < ?";
         $params = [
             $from->setTimezone(new \DateTimeZone('UTC'))->format('c'),
             $to->setTimezone(new \DateTimeZone('UTC'))->format('c'),
         ];
         if ($locationId !== null) {
-            $where .= ' AND location_id = ?';
+            $where .= " AND {$p}location_id = ?";
             $params[] = $locationId;
         }
 

@@ -57,6 +57,16 @@ final class NotificationService
         $this->schedule($tx, $appointmentId, 'cambio', 'cita_cancelacion_salon', new \DateTimeImmutable('now'));
     }
 
+    /**
+     * Programa un recordatorio de retorno "te toca volver" (doc 13 §2.3) para
+     * una cita pasada. Tipo `seguimiento` con plantilla de marketing; el
+     * dispatcher lo entrega (requiere consentimiento del cliente).
+     */
+    public function scheduleReturnReminder(int $appointmentId): void
+    {
+        $this->schedule($this->db, $appointmentId, 'seguimiento', 'recordatorio_retorno', new \DateTimeImmutable('now'));
+    }
+
     private function scheduleReminder(Connection $tx, int $appointmentId): void
     {
         $start = $tx->fetchOne('SELECT start_at FROM appointment WHERE id = ?', [$appointmentId]);
@@ -93,7 +103,7 @@ final class NotificationService
      * (docs/07). Mensajes cortos, un emoji, con sede/fecha/hora/servicio.
      *
      * @param array{type: string, status: string, name: string, location_name: string,
-     *              start_at: string, service_name: string, timezone: string} $ctx
+     *              start_at: string, service_name: string, timezone: string, template?: string} $ctx
      */
     public function render(array $ctx): string
     {
@@ -101,6 +111,12 @@ final class NotificationService
         $loc = $ctx['location_name'];
         $svc = $ctx['service_name'];
         [$fecha, $hora] = $this->formatLocal($ctx['start_at'], $ctx['timezone']);
+
+        // Plantilla de retención "te toca volver" (doc 13 §2.3, marketing).
+        if (($ctx['template'] ?? '') === 'recordatorio_retorno') {
+            return "¡Hola {$name}! ✂️ Hace ya un tiempo de tu última visita a {$loc}.\n"
+                . 'Si te apetece renovar el look, escríbenos "menú" y te buscamos hueco. ¡Te esperamos!';
+        }
 
         return match ($ctx['type']) {
             'confirmacion' => "¡Hola {$name}! ✅ Tu cita en {$loc} está confirmada:\n"
