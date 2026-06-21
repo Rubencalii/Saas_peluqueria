@@ -38,6 +38,7 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Probado de extremo a extremo vía curl
 - ✅ Motor de notificaciones y recordatorios (doc 07): al crear/cambiar/cancelar una cita se programan automáticamente confirmación, recordatorio (24 h antes) y avisos de cambio/cancelación en la tabla `notification`. El comando `php bin/console app:notifications:dispatch` (para cron) entrega las vencidas por WhatsApp y marca `enviada`/`fallida`. Probado de extremo a extremo (con/sin consentimiento, cancelación, recordatorio futuro)
 - ✅ Suite de tests automatizados (PHPUnit, doc 10): 23 tests sobre la lógica crítica — disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, JWT/roles y redacción de notificaciones. Integración contra BD de test aislada con rollback por transacción
+- ✅ Endurecimiento de la API (doc 06 §6): rate limiting por IP en endpoints públicos (60/min → 429 con `Retry-After`), listener global que devuelve errores uniformes en JSON bajo `/api` (404/405/500 sin filtrar detalles en prod), y runner de migraciones versionadas `php bin/console app:db:migrate` (con `--status` y `--baseline`)
 
 ### Pendiente
 

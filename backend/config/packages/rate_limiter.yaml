@@ -1,0 +1,8 @@
+framework:
+    rate_limiter:
+        # Límite para los endpoints públicos de reserva (doc 06 §6): evita
+        # scraping de disponibilidad y abuso del alta de citas. Por IP.
+        public_api:
+            policy: 'sliding_window'
+            limit: 60
+            interval: '1 minute'
