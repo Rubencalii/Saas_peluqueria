@@ -29,12 +29,17 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - `GET /api/v1/admin/customers` · `GET|PATCH /api/v1/admin/customers/{id}` (CRM)
   - `GET /api/v1/admin/conversations` · `POST /api/v1/admin/conversations/{waId}/reply` (bandeja de atención humana de WhatsApp)
   - Probado de extremo a extremo vía curl (login, 401/403, aislamiento por sede)
+- ✅ API de configuración del panel + informes (doc 06 §4), con autorización por rol:
+  - Servicios: `GET|POST|PATCH /api/v1/admin/services` (catálogo de cadena con segmentos de tiempo muerto y precio por sede; CRUD admin_cadena)
+  - Personal: `GET|POST|PATCH /api/v1/admin/staff` y horario semanal `GET|POST /api/v1/admin/staff/{id}/schedule`
+  - Bloqueos: `GET|POST /api/v1/admin/time-blocks` · `DELETE /api/v1/admin/time-blocks/{id}`
+  - Sedes: `GET|POST|PATCH /api/v1/admin/locations` (admin_cadena) · branding `GET|PATCH /api/v1/admin/locations/{id}/branding`
+  - Informes: `GET /api/v1/admin/reports/{occupancy,no-shows,bookings-by-channel}`
+  - Probado de extremo a extremo vía curl
 
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
-- ⏳ Endpoints de configuración del panel: servicios, horarios, time-blocks, branding (doc 06 §4)
-- ⏳ Informes (ocupación, no-shows, reservas por canal)
 - ⏳ Web pública de reserva
 - ⏳ Notificaciones automáticas (recordatorios)
 
