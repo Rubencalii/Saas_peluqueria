@@ -36,12 +36,14 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Sedes: `GET|POST|PATCH /api/v1/admin/locations` (admin_cadena) · branding `GET|PATCH /api/v1/admin/locations/{id}/branding`
   - Informes: `GET /api/v1/admin/reports/{occupancy,no-shows,bookings-by-channel}`
   - Probado de extremo a extremo vía curl
+- ✅ Motor de notificaciones y recordatorios (doc 07): al crear/cambiar/cancelar una cita se programan automáticamente confirmación, recordatorio (24 h antes) y avisos de cambio/cancelación en la tabla `notification`. El comando `php bin/console app:notifications:dispatch` (para cron) entrega las vencidas por WhatsApp y marca `enviada`/`fallida`. Probado de extremo a extremo (con/sin consentimiento, cancelación, recordatorio futuro)
 
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
-- ⏳ Notificaciones automáticas (recordatorios)
+- ⏳ IA conversacional en el bot de WhatsApp (comprensión de lenguaje natural)
+- ⏳ Features de producto del backlog (doc 13): anti no-show, lista de espera, pago/depósito, etc.
 
 ## Arranque rápido (base de datos)
 

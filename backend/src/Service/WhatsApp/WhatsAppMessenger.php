@@ -25,9 +25,9 @@ final class WhatsAppMessenger
     ) {
     }
 
-    public function sendText(string $to, string $body): void
+    public function sendText(string $to, string $body): bool
     {
-        $this->send($to, [
+        return $this->send($to, [
             'type' => 'text',
             'text' => ['body' => $body],
         ]);
@@ -38,9 +38,9 @@ final class WhatsAppMessenger
      *
      * @param list<array{id: string, title: string}> $buttons
      */
-    public function sendButtons(string $to, string $body, array $buttons): void
+    public function sendButtons(string $to, string $body, array $buttons): bool
     {
-        $this->send($to, [
+        return $this->send($to, [
             'type' => 'interactive',
             'interactive' => [
                 'type' => 'button',
@@ -63,9 +63,9 @@ final class WhatsAppMessenger
      *
      * @param list<array{id: string, title: string, description?: string}> $rows
      */
-    public function sendList(string $to, string $body, string $buttonText, array $rows): void
+    public function sendList(string $to, string $body, string $buttonText, array $rows): bool
     {
-        $this->send($to, [
+        return $this->send($to, [
             'type' => 'interactive',
             'interactive' => [
                 'type' => 'list',
@@ -92,8 +92,10 @@ final class WhatsAppMessenger
 
     /**
      * @param array<string, mixed> $message
+     *
+     * @return bool true si el mensaje se envió (o se registró en modo local)
      */
-    private function send(string $to, array $message): void
+    private function send(string $to, array $message): bool
     {
         $payload = array_merge(
             ['messaging_product' => 'whatsapp', 'recipient_type' => 'individual', 'to' => $to],
@@ -107,7 +109,7 @@ final class WhatsAppMessenger
                 'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ]);
 
-            return;
+            return true;
         }
 
         $url = sprintf('https://graph.facebook.com/%s/%s/messages', $this->graphVersion, $this->phoneNumberId);
@@ -133,7 +135,11 @@ final class WhatsAppMessenger
                 'error' => $error,
                 'response' => is_string($response) ? $response : '',
             ]);
+
+            return false;
         }
+
+        return true;
     }
 
     private static function clip(string $text, int $max): string

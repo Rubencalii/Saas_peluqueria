@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Service\Notification\NotificationService;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
 
@@ -37,6 +38,7 @@ final class AppointmentService
     public function __construct(
         private readonly Connection $db,
         private readonly AvailabilityService $availability,
+        private readonly NotificationService $notifications,
     ) {
     }
 
@@ -130,6 +132,8 @@ final class AppointmentService
                     [$idempotencyKey, $appointmentId]
                 );
             }
+
+            $this->notifications->onAppointmentCreated($tx, $appointmentId);
 
             return $this->present($appointmentId, false);
         });
@@ -282,6 +286,8 @@ final class AppointmentService
                 throw $e;
             }
 
+            $this->notifications->onAppointmentRescheduled($tx, $id);
+
             return $this->present($id, false);
         });
     }
@@ -304,12 +310,15 @@ final class AppointmentService
         $this->assertActive($appt);
         $this->assertWithinManageWindow($appt);
 
-        $this->db->executeStatement(
-            "UPDATE appointment SET status = 'cancelada' WHERE id = ?",
-            [$id]
-        );
+        return $this->db->transactional(function (Connection $tx) use ($id): array {
+            $tx->executeStatement(
+                "UPDATE appointment SET status = 'cancelada' WHERE id = ?",
+                [$id]
+            );
+            $this->notifications->onAppointmentCancelled($tx, $id);
 
-        return $this->present($id, false);
+            return $this->present($id, false);
+        });
     }
 
     /**

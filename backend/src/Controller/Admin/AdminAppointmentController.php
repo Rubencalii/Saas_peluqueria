@@ -8,6 +8,7 @@ use App\Service\AppointmentException;
 use App\Service\AppointmentService;
 use App\Service\Auth\AuthException;
 use App\Service\Auth\AuthService;
+use App\Service\Notification\NotificationService;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -30,6 +31,7 @@ final class AdminAppointmentController extends AdminController
         private readonly Connection $db,
         private readonly AppointmentService $appointments,
         private readonly AuthService $auth,
+        private readonly NotificationService $notifications,
     ) {
     }
 
@@ -121,10 +123,10 @@ final class AdminAppointmentController extends AdminController
             return $appt;
         }
 
-        $this->db->executeStatement(
-            "UPDATE appointment SET status = 'cancelada' WHERE id = ?",
-            [$id]
-        );
+        $this->db->transactional(function (Connection $tx) use ($id): void {
+            $tx->executeStatement("UPDATE appointment SET status = 'cancelada' WHERE id = ?", [$id]);
+            $this->notifications->onAppointmentCancelled($tx, $id);
+        });
 
         return $this->json($this->detail($id));
     }
