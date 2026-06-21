@@ -49,6 +49,9 @@
             "./bin/phpunit"
         ]
     },
+    "stripe/stripe-php": {
+        "version": "v20.2.1"
+    },
     "symfony/console": {
         "version": "8.1",
         "recipe": {

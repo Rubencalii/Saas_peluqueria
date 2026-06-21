@@ -21,6 +21,8 @@ services:
             $secret: '%env(APP_SECRET)%'
             $apiKey: '%env(ANTHROPIC_API_KEY)%'
             $model: '%env(ANTHROPIC_MODEL)%'
+            $secretKey: '%env(STRIPE_SECRET_KEY)%'
+            $webhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
             $publicApiLimiter: '@limiter.public_api'
             $debug: '%kernel.debug%'
             $projectDir: '%kernel.project_dir%'

@@ -48,13 +48,15 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Anti no-show (§2.2): `GET /api/v1/admin/reports/no-show-customers` — ranking de clientes con más ausencias
   - Lista de espera (§2.4): `POST /api/v1/waitlist` (alta pública, idempotente), bandeja en el panel `GET /api/v1/admin/waitlist` + `DELETE /{id}`, botón "🔔 Avísame" en el bot cuando el día está completo, y comando `app:waitlist:notify` (cron) que avisa por WhatsApp al liberarse un hueco (reutiliza el algoritmo de disponibilidad)
   - Sincronización con calendario (§2.6): feed iCal por profesional `GET /api/v1/calendar/{token}.ics` (solo lectura, suscribible en Google/Apple Calendar) + en el panel `GET /api/v1/admin/staff/{id}/calendar` y `POST .../calendar/rotate`
-- ✅ Runner de migraciones estrenado: `app:db:migrate --baseline` + migraciones `0006_waitlist.sql` y `0007_staff_calendar_token.sql` aplicadas a las BD dev y test
+  - Depósito / pago online (§2.5): depósito por servicio (`deposit_amount`) cobrado con Stripe (PaymentIntent). `POST /api/v1/appointments/{id}/deposit` devuelve el `client_secret`; `POST /api/v1/webhooks/stripe` confirma el cobro. Desacoplado de la reserva y desactivado sin `STRIPE_SECRET_KEY`
+- ✅ Runner de migraciones estrenado: `app:db:migrate --baseline` + migraciones `0006`–`0008` (waitlist, token de calendario, pagos) aplicadas a las BD dev y test
 
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
-- ⏳ Backlog restante (doc 13): pago/depósito online (§2.5) — requiere Stripe y decidir alcance
+
+> El **backend está funcionalmente completo** (núcleo + todo el backlog del doc 13). Lo que queda es **frontend**.
 
 ## Arranque rápido (base de datos)
 

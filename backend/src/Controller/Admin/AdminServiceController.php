@@ -37,7 +37,7 @@ final class AdminServiceController extends AdminController
         }
 
         $services = $this->db->fetchAllAssociative(
-            'SELECT id, name, duration_min, buffer_min, price, description, active FROM service ORDER BY name'
+            'SELECT id, name, duration_min, buffer_min, price, description, active, deposit_amount FROM service ORDER BY name'
         );
         $segments = $this->db->fetchAllAssociative(
             'SELECT service_id, position, minutes, busy FROM service_segment ORDER BY service_id, position'
@@ -70,6 +70,7 @@ final class AdminServiceController extends AdminController
                 'duration_min' => (int) $r['duration_min'],
                 'buffer_min' => (int) $r['buffer_min'],
                 'price' => $r['price'] !== null ? (float) $r['price'] : null,
+                'deposit_amount' => $r['deposit_amount'] !== null ? (float) $r['deposit_amount'] : null,
                 'description' => $r['description'] !== null ? (string) $r['description'] : null,
                 'active' => (bool) $r['active'],
                 'segments' => $byService[$id]['segments'] ?? [],
@@ -105,11 +106,12 @@ final class AdminServiceController extends AdminController
 
         $id = $this->db->transactional(function (Connection $tx) use ($payload, $name, $duration): int {
             $sid = (int) $tx->fetchOne(
-                'INSERT INTO service (name, duration_min, buffer_min, price, description, active)
-                 VALUES (?, ?, ?, ?, ?, COALESCE(?, TRUE)) RETURNING id',
+                'INSERT INTO service (name, duration_min, buffer_min, price, deposit_amount, description, active)
+                 VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, TRUE)) RETURNING id',
                 [
                     $name, $duration, (int) ($payload['buffer_min'] ?? 0),
                     $this->numOrNull($payload['price'] ?? null),
+                    $this->numOrNull($payload['deposit_amount'] ?? null),
                     isset($payload['description']) ? (string) $payload['description'] : null,
                     isset($payload['active']) ? (bool) $payload['active'] : null,
                 ]
@@ -160,6 +162,7 @@ final class AdminServiceController extends AdminController
             'duration_min' => static fn ($v) => (int) $v,
             'buffer_min' => static fn ($v) => (int) $v,
             'price' => fn ($v) => $this->numOrNull($v),
+            'deposit_amount' => fn ($v) => $this->numOrNull($v),
             'description' => static fn ($v) => $v !== null ? (string) $v : null,
             'active' => static fn ($v) => (bool) $v,
         ];
