@@ -26,6 +26,7 @@ final class PublicRateLimitListener
         ['method' => 'POST', 'path' => '/api/v1/appointments'],
         ['method' => 'GET', 'path' => '/api/v1/appointments/lookup'],
         ['method' => 'GET', 'path' => '/api/v1/availability'],
+        ['method' => 'POST', 'path' => '/api/v1/waitlist'],
     ];
 
     public function __construct(private readonly RateLimiterFactoryInterface $publicApiLimiter)

@@ -46,12 +46,14 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Recordatorio de retorno "te toca volver" (§2.3): comando `app:notifications:return-reminders --weeks=N` (cron) que avisa a clientes que no vuelven hace ~N semanas, reutilizando el motor de notificaciones (con consentimiento, idempotente)
   - Informes avanzados (§2.8): `GET /api/v1/admin/reports/{revenue,peak-hours,retention}` — ingresos por profesional/servicio, horas punta y tasa de retención
   - Anti no-show (§2.2): `GET /api/v1/admin/reports/no-show-customers` — ranking de clientes con más ausencias
+  - Lista de espera (§2.4): `POST /api/v1/waitlist` (alta pública, idempotente), bandeja en el panel `GET /api/v1/admin/waitlist` + `DELETE /{id}`, botón "🔔 Avísame" en el bot cuando el día está completo, y comando `app:waitlist:notify` (cron) que avisa por WhatsApp al liberarse un hueco (reutiliza el algoritmo de disponibilidad)
+- ✅ Runner de migraciones estrenado en producción: `app:db:migrate --baseline` + migración `0006_waitlist.sql` aplicada a las BD dev y test
 
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
-- ⏳ Backlog restante (doc 13): lista de espera, pago/depósito online, sync calendario
+- ⏳ Backlog restante (doc 13): pago/depósito online (§2.5), sync calendario/iCal (§2.6)
 
 ## Arranque rápido (base de datos)
 

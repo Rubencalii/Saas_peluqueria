@@ -27,6 +27,7 @@ final class BotEngine
         private readonly AppointmentService $appointments,
         private readonly WhatsAppMessenger $wa,
         private readonly AiAssistant $ai,
+        private readonly \App\Service\Waitlist\WaitlistService $waitlist,
     ) {
     }
 
@@ -51,6 +52,13 @@ final class BotEngine
         }
         if (in_array($input, ['menu', 'menú', 'hola', 'inicio', 'start', 'buenas'], true)) {
             $this->showMenu($waId, $phone);
+
+            return;
+        }
+
+        // Apuntarse a la lista de espera (botón "Avísame" cuando el día está completo).
+        if ($interactive === 'wait:join') {
+            $this->joinWaitlist($waId, $phone, $conv);
 
             return;
         }
@@ -212,6 +220,45 @@ final class BotEngine
               WHERE ss.staff_id = ? AND ss.service_id = ?',
             [$locationId, $staffId, $serviceId]
         ) !== false;
+    }
+
+    /**
+     * Apunta al cliente a la lista de espera con los datos del flujo en curso.
+     *
+     * @param array{state: string, data: array<string, mixed>} $conv
+     */
+    private function joinWaitlist(string $waId, string $phone, array $conv): void
+    {
+        $data = $conv['data'];
+        if (!isset($data['location_id'], $data['service_id'])) {
+            $this->fallback($waId, $phone);
+
+            return;
+        }
+
+        $customer = $this->customerByPhone($phone);
+        try {
+            $this->waitlist->join(
+                (int) $data['location_id'],
+                (int) $data['service_id'],
+                isset($data['staff_id']) && $data['staff_id'] !== null ? (int) $data['staff_id'] : null,
+                $customer['name'] ?? 'Cliente',
+                $phone,
+                true, // se apunta por WhatsApp: consiente que le avisemos
+                isset($data['date']) ? (string) $data['date'] : null,
+            );
+        } catch (\App\Service\Waitlist\WaitlistException $e) {
+            $this->wa->sendText($waId, 'No he podido apuntarte: ' . $e->getMessage());
+            $this->showMenu($waId, $phone);
+
+            return;
+        }
+
+        $this->save($waId, 'menu', []);
+        $this->wa->sendText(
+            $waId,
+            '¡Hecho! 🔔 Te he apuntado a la lista de espera. Te aviso por aquí en cuanto se libere un hueco.'
+        );
     }
 
     // -----------------------------------------------------------------
@@ -377,12 +424,22 @@ final class BotEngine
         }
 
         if ($offer['slots'] === []) {
-            $this->save($waId, str_starts_with($state, 'reschedule') ? 'reschedule:date' : 'reserve:date', $data);
-            $this->wa->sendButtons($waId, 'Ese día está completo 😕 ¿Probamos otro día?', [
-                ['id' => 'date:today', 'title' => 'Hoy'],
-                ['id' => 'date:tomorrow', 'title' => 'Mañana'],
-                ['id' => 'date:other', 'title' => 'Otro día'],
-            ]);
+            $isReschedule = str_starts_with($state, 'reschedule');
+            $this->save($waId, $isReschedule ? 'reschedule:date' : 'reserve:date', $data);
+
+            // En una reserva nueva ofrecemos la lista de espera; al reprogramar no
+            // tiene sentido (ya hay una cita), así que solo proponemos otro día.
+            $buttons = $isReschedule
+                ? [
+                    ['id' => 'date:today', 'title' => 'Hoy'],
+                    ['id' => 'date:tomorrow', 'title' => 'Mañana'],
+                    ['id' => 'date:other', 'title' => 'Otro día'],
+                ]
+                : [
+                    ['id' => 'date:other', 'title' => '📅 Otro día'],
+                    ['id' => 'wait:join', 'title' => '🔔 Avísame'],
+                ];
+            $this->wa->sendButtons($waId, 'Ese día está completo 😕 ¿Qué prefieres?', $buttons);
 
             return;
         }
