@@ -27,6 +27,7 @@ Conjunto de documentos de partida para construir una plataforma de reservas con:
 | 11 | **Despliegue y DevOps** | Entornos, backups, CI/CD, monitorización |
 | 12 | **Manual del personal** | Guía de uso del panel para recepción y profesionales |
 | 13 | **Funcionalidades adicionales (backlog)** | Mejoras futuras y su priorización |
+| 14 | **Estado del backend** | Inventario de lo implementado y backlog técnico (actualizado) |
 
 ---
 
