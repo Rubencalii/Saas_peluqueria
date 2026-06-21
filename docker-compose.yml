@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16
+    container_name: peluqueria_db
+    environment:
+      POSTGRES_USER: peluqueria
+      POSTGRES_PASSWORD: peluqueria
+      POSTGRES_DB: peluqueria
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5446:5432"   # 5446 en el host para no chocar con otros Postgres locales
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Migraciones + seed se aplican automáticamente SÓLO en el primer
+      # arranque (volumen vacío), en orden alfabético. El entrypoint de
+      # Postgres no entra en subdirectorios: por eso se montan planos.
+      - ./db/migrations/0001_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./db/migrations/0002_overlap_protection.sql:/docker-entrypoint-initdb.d/02_overlap.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/03_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peluqueria -d peluqueria"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

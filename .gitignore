@@ -1,0 +1,26 @@
+# Configuración local del entorno / herramientas (no forma parte del proyecto)
+/.claude/
+.idea/
+.vscode/
+*.code-workspace
+
+# Secretos y entornos locales (los valores reales no se versionan)
+.env.local
+.env.*.local
+backend/.env.local
+backend/.env.*.local
+
+# Dependencias y artefactos generados
+/backend/vendor/
+/backend/var/
+/backend/public/bundles/
+node_modules/
+
+# Datos de Postgres si alguien monta el volumen como carpeta
+/db/pgdata/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
