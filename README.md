@@ -40,11 +40,12 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
 - ✅ Suite de tests automatizados (PHPUnit, doc 10): 23 tests sobre la lógica crítica — disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, JWT/roles y redacción de notificaciones. Integración contra BD de test aislada con rollback por transacción
 - ✅ Endurecimiento de la API (doc 06 §6): rate limiting por IP en endpoints públicos (60/min → 429 con `Retry-After`), listener global que devuelve errores uniformes en JSON bajo `/api` (404/405/500 sin filtrar detalles en prod), y runner de migraciones versionadas `php bin/console app:db:migrate` (con `--status` y `--baseline`)
 
+- ✅ IA conversacional en el bot de WhatsApp (decisión doc 00): capa de comprensión de lenguaje natural con Claude (SDK oficial, salida estructurada) que deduce intención + servicio/profesional/fecha de un mensaje libre ("quiero un corte mañana con Laura") y arranca el flujo de reserva ya existente. Se desactiva sin `ANTHROPIC_API_KEY` (el bot funciona solo con botones). Modelo configurable con `ANTHROPIC_MODEL` (por defecto `claude-opus-4-8`)
+
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
-- ⏳ IA conversacional en el bot de WhatsApp (comprensión de lenguaje natural)
 - ⏳ Features de producto del backlog (doc 13): anti no-show, lista de espera, pago/depósito, etc.
 
 ## Arranque rápido (base de datos)

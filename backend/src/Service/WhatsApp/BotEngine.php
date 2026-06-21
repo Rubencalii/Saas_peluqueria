@@ -26,6 +26,7 @@ final class BotEngine
         private readonly AvailabilityService $availability,
         private readonly AppointmentService $appointments,
         private readonly WhatsAppMessenger $wa,
+        private readonly AiAssistant $ai,
     ) {
     }
 
@@ -51,6 +52,15 @@ final class BotEngine
         if (in_array($input, ['menu', 'menú', 'hola', 'inicio', 'start', 'buenas'], true)) {
             $this->showMenu($waId, $phone);
 
+            return;
+        }
+
+        // Comprensión de lenguaje natural: en el menú (o conversación nueva), si el
+        // cliente escribe texto libre en vez de pulsar un botón, la IA deduce qué
+        // quiere y arranca el flujo correspondiente. Si la IA está desactivada o no
+        // lo entiende, seguimos con la máquina de estados por botones de siempre.
+        if ($interactive === null && $conv['state'] === 'menu' && trim((string) $text) !== ''
+            && $this->tryAi($waId, $phone, (string) $text)) {
             return;
         }
 
@@ -97,6 +107,111 @@ final class BotEngine
             'menu:manage' => $this->showNextAppointment($waId, $phone, true),
             default => $this->fallback($waId, $phone),
         };
+    }
+
+    // -----------------------------------------------------------------
+    // Comprensión de lenguaje natural (IA)
+    // -----------------------------------------------------------------
+
+    /**
+     * Interpreta texto libre con la IA y arranca el flujo correspondiente.
+     *
+     * @return bool true si la IA entendió y enrutó el mensaje
+     */
+    private function tryAi(string $waId, string $phone, string $text): bool
+    {
+        if (!$this->ai->isEnabled()) {
+            return false;
+        }
+
+        $locationId = $this->interpretationLocation($phone);
+        if ($locationId === null) {
+            return false;
+        }
+
+        $result = $this->ai->interpret($text, $locationId);
+        if ($result === null || $result['intent'] === 'otro') {
+            return false; // sin IA o sin intención clara → menú por botones
+        }
+
+        if ($result['reply'] !== '') {
+            $this->wa->sendText($waId, $result['reply']);
+        }
+
+        match ($result['intent']) {
+            'reservar' => $this->startReserveAi($waId, $locationId, $result['service_id'], $result['staff_id']),
+            'ver_cita' => $this->showNextAppointment($waId, $phone, false),
+            'cambiar', 'cancelar' => $this->showNextAppointment($waId, $phone, true),
+            'hablar_humano' => $this->toHuman($waId),
+            default => $this->showMenu($waId, $phone),
+        };
+
+        return true;
+    }
+
+    /**
+     * Sede de referencia para interpretar: la de la última cita del cliente, o la
+     * única sede activa. Si hay varias y no sabemos cuál, devolvemos la primera
+     * (el catálogo de servicios es de cadena; la sede definitiva se elige luego).
+     */
+    private function interpretationLocation(string $phone): ?int
+    {
+        $last = $this->db->fetchOne(
+            'SELECT a.location_id FROM appointment a
+               JOIN customer c ON c.id = a.customer_id
+              WHERE c.phone = ? ORDER BY a.start_at DESC LIMIT 1',
+            [$phone]
+        );
+        if ($last !== false) {
+            return (int) $last;
+        }
+
+        $first = $this->db->fetchOne('SELECT id FROM location WHERE active ORDER BY id LIMIT 1');
+
+        return $first === false ? null : (int) $first;
+    }
+
+    private function startReserveAi(string $waId, int $locationId, ?int $serviceId, ?int $staffId): void
+    {
+        $locations = $this->db->fetchAllAssociative('SELECT id FROM location WHERE active ORDER BY id');
+
+        // Multi-sede sin saber cuál: arrancamos el flujo normal (elige sede primero).
+        if (count($locations) !== 1) {
+            $this->startReserve($waId);
+
+            return;
+        }
+        $locId = (int) $locations[0]['id'];
+
+        if ($serviceId === null) {
+            $this->askService($waId, ['data' => ['location_id' => $locId]]);
+
+            return;
+        }
+
+        // Servicio detectado: si además hay profesional válido para ese servicio,
+        // saltamos directos a elegir día; si no, ofrecemos la lista de profesionales.
+        if ($staffId !== null && $this->staffDoesService($locId, $serviceId, $staffId)) {
+            $this->askDate($waId, 'reserve:date', [
+                'location_id' => $locId,
+                'service_id' => $serviceId,
+                'staff_id' => $staffId,
+            ]);
+
+            return;
+        }
+
+        $this->promptStaff($waId, $locId, $serviceId);
+    }
+
+    private function staffDoesService(int $locationId, int $serviceId, int $staffId): bool
+    {
+        return $this->db->fetchOne(
+            'SELECT 1 FROM staff_service ss
+               JOIN staff_location sl ON sl.staff_id = ss.staff_id AND sl.location_id = ?
+              WHERE ss.staff_id = ? AND ss.service_id = ?',
+            [$locationId, $staffId, $serviceId]
+        ) !== false;
     }
 
     // -----------------------------------------------------------------
@@ -163,7 +278,15 @@ final class BotEngine
 
         $serviceId = (int) substr($input, 4);
         $locationId = (int) $conv['data']['location_id'];
+        $this->promptStaff($waId, $locationId, $serviceId);
+    }
 
+    /**
+     * Muestra la lista de profesionales para un servicio/sede y deja el flujo en
+     * reserve:staff. Reutilizado por la selección de servicio y por la IA.
+     */
+    private function promptStaff(string $waId, int $locationId, int $serviceId): void
+    {
         $staff = $this->db->fetchAllAssociative(
             'SELECT s.id, s.name
                FROM staff s
@@ -173,8 +296,7 @@ final class BotEngine
             [$serviceId, $locationId]
         );
 
-        $data = ['location_id' => $locationId, 'service_id' => $serviceId];
-        $this->save($waId, 'reserve:staff', $data);
+        $this->save($waId, 'reserve:staff', ['location_id' => $locationId, 'service_id' => $serviceId]);
 
         $rows = [['id' => 'staff:any', 'title' => 'Sin preferencia']];
         foreach ($staff as $s) {
