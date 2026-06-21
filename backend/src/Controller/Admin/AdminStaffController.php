@@ -262,6 +262,61 @@ final class AdminStaffController extends AdminController
     }
 
     /**
+     * Devuelve la URL del feed iCal del profesional (doc 13 §2.6) para que se
+     * suscriba en su calendario.
+     */
+    #[Route('/api/v1/admin/staff/{id}/calendar', name: 'admin_staff_calendar', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function getCalendar(int $id, Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        try {
+            $this->auth->assertRole($user, self::CONFIG_ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+        if (($denied = $this->assertManagesStaff($user, $id)) !== null) {
+            return $denied;
+        }
+
+        $token = $this->db->fetchOne('SELECT calendar_token FROM staff WHERE id = ?', [$id]);
+        if ($token === false) {
+            return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
+        }
+
+        return $this->json(['feed_url' => $this->feedUrl($request, (string) $token)]);
+    }
+
+    /**
+     * Rota el token del feed iCal (invalida las suscripciones anteriores).
+     */
+    #[Route('/api/v1/admin/staff/{id}/calendar/rotate', name: 'admin_staff_calendar_rotate', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function rotateCalendar(int $id, Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        try {
+            $this->auth->assertRole($user, self::CONFIG_ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+        if (!$this->staffExists($id)) {
+            return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
+        }
+        if (($denied = $this->assertManagesStaff($user, $id)) !== null) {
+            return $denied;
+        }
+
+        $token = bin2hex(random_bytes(16));
+        $this->db->executeStatement('UPDATE staff SET calendar_token = ? WHERE id = ?', [$token, $id]);
+
+        return $this->json(['feed_url' => $this->feedUrl($request, $token)]);
+    }
+
+    private function feedUrl(Request $request, string $token): string
+    {
+        return $request->getSchemeAndHttpHost() . '/api/v1/calendar/' . $token . '.ics';
+    }
+
+    /**
      * Un admin_sede sólo gestiona profesionales que trabajan en su sede.
      *
      * @param array{role: string, location_id: int|null} $user
