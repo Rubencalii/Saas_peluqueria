@@ -1,0 +1,598 @@
+openapi: 3.1.0
+info:
+  title: API · Reservas Multi-sede (Peluquerías)
+  version: "1.0"
+  description: |
+    API REST única que comparten la web pública, el bot de WhatsApp y el panel
+    (doc 06). Horas en **UTC** (ISO 8601). Endpoints del panel autenticados con
+    JWT (Bearer) y autorizados por rol. Errores con forma uniforme
+    `{ "error": { "code", "message" } }`.
+
+servers:
+  - url: http://localhost:8000
+    description: Desarrollo
+
+tags:
+  - name: Público
+    description: Reserva del cliente (sin login; con rate limiting)
+  - name: Auth
+    description: Login del panel y reset de contraseña
+  - name: Panel
+    description: Endpoints internos (requieren Bearer JWT + rol)
+  - name: Webhooks
+    description: Entradas de Meta (WhatsApp) y Stripe
+  - name: Salud
+
+security: []
+
+paths:
+  # ---------------------------------------------------------------- Público
+  /api/v1/health:
+    get:
+      tags: [Salud]
+      summary: Health check (app + BD)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
+        "503": { description: BD inaccesible }
+
+  /api/v1/locations:
+    get:
+      tags: [Público]
+      summary: Sedes activas
+      responses:
+        "200":
+          description: Lista de sedes
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Location" } } } }
+
+  /api/v1/locations/{slug}/services:
+    get:
+      tags: [Público]
+      summary: Servicios y precio de una sede
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Servicios de la sede
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Service" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/availability:
+    get:
+      tags: [Público]
+      summary: Huecos disponibles (algoritmo doc 02)
+      parameters:
+        - { name: location_id, in: query, required: true, schema: { type: integer } }
+        - { name: service_id, in: query, required: true, schema: { type: integer } }
+        - { name: staff_id, in: query, required: false, schema: { type: integer }, description: "Opcional; sin preferencia si se omite" }
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        "200": { description: Huecos, content: { application/json: { schema: { $ref: "#/components/schemas/Availability" } } } }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /api/v1/appointments:
+    post:
+      tags: [Público]
+      summary: Crear reserva (atómica)
+      description: "Idempotente con la cabecera `Idempotency-Key`. Devuelve 409 si el hueco ya está ocupado."
+      parameters:
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AppointmentInput" } } }
+      responses:
+        "201": { description: Creada, content: { application/json: { schema: { $ref: "#/components/schemas/AppointmentResult" } } } }
+        "200": { description: "Reproducción idempotente", content: { application/json: { schema: { $ref: "#/components/schemas/AppointmentResult" } } } }
+        "409": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /api/v1/appointments/lookup:
+    get:
+      tags: [Público]
+      summary: Consultar mis citas (teléfono + código)
+      parameters:
+        - { name: phone, in: query, required: true, schema: { type: string } }
+        - { name: code, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Próximas citas del cliente, content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/appointments/{id}/reschedule:
+    patch:
+      tags: [Público]
+      summary: Reprogramar (verificación por código)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, properties: { start: { type: string, format: date-time }, code: { type: string } }, required: [start] } } }
+      responses:
+        "200": { description: Reprogramada, content: { application/json: { schema: { $ref: "#/components/schemas/AppointmentResult" } } } }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /api/v1/appointments/{id}:
+    delete:
+      tags: [Público]
+      summary: Cancelar (verificación por código)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: code, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: Cancelada }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /api/v1/waitlist:
+    post:
+      tags: [Público]
+      summary: Apuntarse a la lista de espera
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [location_id, service_id, customer]
+              properties:
+                location_id: { type: integer }
+                service_id: { type: integer }
+                staff_id: { type: [integer, "null"] }
+                date: { type: [string, "null"], format: date }
+                wa_consent: { type: boolean }
+                customer: { $ref: "#/components/schemas/CustomerInput" }
+      responses:
+        "201": { description: Apuntado, content: { application/json: { schema: { type: object, properties: { waitlist_id: { type: integer }, already: { type: boolean } } } } } }
+        "200": { description: "Ya estaba apuntado" }
+
+  /api/v1/appointments/{id}/deposit:
+    post:
+      tags: [Público]
+      summary: Iniciar el pago del depósito (Stripe)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { code: { type: string } } } } }
+      responses:
+        "200": { description: "PaymentIntent", content: { application/json: { schema: { type: object, properties: { client_secret: { type: string }, amount: { type: number }, currency: { type: string }, status: { type: string } } } } } }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { description: "Pagos desactivados" }
+
+  /api/v1/calendar/{token}.ics:
+    get:
+      tags: [Público]
+      summary: Feed iCal de la agenda de un profesional
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string, pattern: "^[a-f0-9]{32}$" } }
+      responses:
+        "200": { description: Calendario, content: { text/calendar: { schema: { type: string } } } }
+        "404": { description: Token no válido }
+
+  # ---------------------------------------------------------------- Auth
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login del panel (devuelve JWT)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string }, password: { type: string } } } } }
+      responses:
+        "200": { description: Token + usuario, content: { application/json: { schema: { $ref: "#/components/schemas/LoginResponse" } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /api/v1/auth/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Solicitar enlace de reset (respuesta genérica)
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { email: { type: string } } } } }
+      responses:
+        "200": { description: "Siempre 200 (no revela si el email existe)" }
+
+  /api/v1/auth/password/reset:
+    post:
+      tags: [Auth]
+      summary: Restablecer contraseña con token
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [token, password], properties: { token: { type: string }, password: { type: string, minLength: 8 } } } } }
+      responses:
+        "200": { description: Cambiada }
+        "400": { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- Panel
+  /api/v1/admin/me:
+    get:
+      tags: [Panel]
+      summary: Usuario autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Usuario }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /api/v1/admin/agenda:
+    get:
+      tags: [Panel]
+      summary: Agenda por sede (día/semana)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: location_id, in: query, schema: { type: integer } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+        - { name: view, in: query, schema: { type: string, enum: [day, week] } }
+      responses:
+        "200": { description: Citas del rango }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /api/v1/admin/appointments:
+    post:
+      tags: [Panel]
+      summary: Alta manual de cita
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AppointmentInput" } } }
+      responses:
+        "201": { description: Creada }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /api/v1/admin/appointments/{id}:
+    patch:
+      tags: [Panel]
+      summary: Editar estado/notas
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [pendiente, confirmada, completada, no_show, cancelada] }, notes: { type: [string, "null"] } } } } }
+      responses: { "200": { description: Actualizada }, "404": { $ref: "#/components/responses/Error" } }
+    delete:
+      tags: [Panel]
+      summary: Cancelar cita (panel)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Cancelada } }
+
+  /api/v1/admin/customers:
+    get:
+      tags: [Panel]
+      summary: Buscar clientes
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: query, in: query, schema: { type: string } }]
+      responses: { "200": { description: Clientes } }
+
+  /api/v1/admin/customers/{id}:
+    get:
+      tags: [Panel]
+      summary: Ficha del cliente + historial
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Cliente }, "404": { $ref: "#/components/responses/Error" } }
+    patch:
+      tags: [Panel]
+      summary: Editar cliente (nombre/email)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { name: { type: string }, email: { type: [string, "null"] } } } } } }
+      responses: { "200": { description: Actualizado } }
+
+  /api/v1/admin/services:
+    get:
+      tags: [Panel]
+      summary: Catálogo de servicios
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Servicios } }
+    post:
+      tags: [Panel]
+      summary: Crear servicio (admin_cadena)
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ServiceInput" } } } }
+      responses: { "201": { description: Creado }, "403": { $ref: "#/components/responses/Error" } }
+
+  /api/v1/admin/services/{id}:
+    patch:
+      tags: [Panel]
+      summary: Editar servicio (admin_cadena)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/ServiceInput" } } } }
+      responses: { "200": { description: Actualizado } }
+
+  /api/v1/admin/staff:
+    get:
+      tags: [Panel]
+      summary: Personal (por sede)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: location_id, in: query, schema: { type: integer } }]
+      responses: { "200": { description: Personal } }
+    post:
+      tags: [Panel]
+      summary: Alta de profesional
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, email: { type: [string, "null"] }, phone: { type: [string, "null"] }, location_ids: { type: array, items: { type: integer } }, service_ids: { type: array, items: { type: integer } } } } } } }
+      responses: { "201": { description: Creado } }
+
+  /api/v1/admin/staff/{id}:
+    patch:
+      tags: [Panel]
+      summary: Editar profesional
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Actualizado } }
+
+  /api/v1/admin/staff/{id}/schedule:
+    get:
+      tags: [Panel]
+      summary: Horario semanal del profesional
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: "Tramos (weekday 0=lun..6=dom)" } }
+    post:
+      tags: [Panel]
+      summary: Reemplazar horario en una sede
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [location_id], properties: { location_id: { type: integer }, entries: { type: array, items: { type: object, properties: { weekday: { type: integer }, start_time: { type: string }, end_time: { type: string } } } } } } } } }
+      responses: { "200": { description: Guardado } }
+
+  /api/v1/admin/staff/{id}/calendar:
+    get:
+      tags: [Panel]
+      summary: URL del feed iCal del profesional
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: "{ feed_url }" } }
+
+  /api/v1/admin/staff/{id}/calendar/rotate:
+    post:
+      tags: [Panel]
+      summary: Rotar el token del feed iCal
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: "{ feed_url } nuevo" } }
+
+  /api/v1/admin/time-blocks:
+    get:
+      tags: [Panel]
+      summary: Bloqueos de agenda
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: location_id, in: query, schema: { type: integer } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses: { "200": { description: Bloqueos } }
+    post:
+      tags: [Panel]
+      summary: Crear bloqueo
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [staff_id, start, end], properties: { staff_id: { type: integer }, location_id: { type: [integer, "null"] }, start: { type: string, format: date-time }, end: { type: string, format: date-time }, reason: { type: [string, "null"] } } } } } }
+      responses: { "201": { description: Creado } }
+
+  /api/v1/admin/time-blocks/{id}:
+    delete:
+      tags: [Panel]
+      summary: Borrar bloqueo
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Borrado } }
+
+  /api/v1/admin/locations:
+    get:
+      tags: [Panel]
+      summary: Sedes
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Sedes } }
+    post:
+      tags: [Panel]
+      summary: Crear sede (admin_cadena)
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name, slug], properties: { name: { type: string }, slug: { type: string }, address: { type: [string, "null"] }, phone: { type: [string, "null"] }, timezone: { type: string } } } } } }
+      responses: { "201": { description: Creada }, "409": { $ref: "#/components/responses/Error" } }
+
+  /api/v1/admin/locations/{id}:
+    patch:
+      tags: [Panel]
+      summary: Editar sede (admin_cadena)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Actualizada } }
+
+  /api/v1/admin/locations/{id}/branding:
+    get:
+      tags: [Panel]
+      summary: Branding de la sede
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Branding } }
+    patch:
+      tags: [Panel]
+      summary: Editar branding (custom_domain solo admin_cadena)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { logo_url: { type: [string, "null"] }, color_primary: { type: [string, "null"] }, color_accent: { type: [string, "null"] }, font_family: { type: [string, "null"] }, custom_domain: { type: [string, "null"] }, extra: { type: [object, "null"] } } } } } }
+      responses: { "200": { description: Actualizado } }
+
+  /api/v1/admin/conversations:
+    get:
+      tags: [Panel]
+      summary: Bandeja de atención humana de WhatsApp
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: status, in: query, schema: { type: string, enum: [pendiente, all] } }]
+      responses: { "200": { description: Conversaciones } }
+
+  /api/v1/admin/conversations/{waId}/reply:
+    post:
+      tags: [Panel]
+      summary: Responder a un cliente y, opcional, cerrar la derivación
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: waId, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [message], properties: { message: { type: string }, resolve: { type: boolean } } } } } }
+      responses: { "200": { description: Enviado } }
+
+  /api/v1/admin/waitlist:
+    get:
+      tags: [Panel]
+      summary: Lista de espera
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: location_id, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string, enum: [esperando, avisado, convertido, cancelado] } }
+      responses: { "200": { description: Entradas } }
+
+  /api/v1/admin/waitlist/{id}:
+    delete:
+      tags: [Panel]
+      summary: Cancelar entrada de la lista
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Cancelada } }
+
+  /api/v1/admin/reports/occupancy:
+    get: { tags: [Panel], summary: "Ocupación (minutos reservados vs capacidad)", security: [{ bearerAuth: [] }], parameters: [{ name: location_id, in: query, schema: { type: integer } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }], responses: { "200": { description: Informe } } }
+  /api/v1/admin/reports/no-shows:
+    get: { tags: [Panel], summary: "Tasa de no-show", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+  /api/v1/admin/reports/bookings-by-channel:
+    get: { tags: [Panel], summary: "Reservas por canal", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+  /api/v1/admin/reports/revenue:
+    get: { tags: [Panel], summary: "Ingresos por profesional/servicio", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+  /api/v1/admin/reports/peak-hours:
+    get: { tags: [Panel], summary: "Horas punta (día/hora)", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+  /api/v1/admin/reports/retention:
+    get: { tags: [Panel], summary: "Tasa de retención", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+  /api/v1/admin/reports/no-show-customers:
+    get: { tags: [Panel], summary: "Clientes con más ausencias", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+
+  # ---------------------------------------------------------------- Webhooks
+  /api/v1/webhooks/whatsapp:
+    get:
+      tags: [Webhooks]
+      summary: Handshake de verificación de Meta
+      parameters:
+        - { name: "hub.mode", in: query, schema: { type: string } }
+        - { name: "hub.verify_token", in: query, schema: { type: string } }
+        - { name: "hub.challenge", in: query, schema: { type: string } }
+      responses: { "200": { description: challenge }, "403": { description: Token inválido } }
+    post:
+      tags: [Webhooks]
+      summary: "Mensajes entrantes (firma X-Hub-Signature-256)"
+      responses: { "200": { description: OK }, "403": { description: Firma inválida } }
+
+  /api/v1/webhooks/stripe:
+    post:
+      tags: [Webhooks]
+      summary: "Confirmación de pago (firma Stripe-Signature)"
+      responses: { "200": { description: OK }, "400": { description: Firma inválida } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Error:
+      description: Error con forma uniforme
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, example: SLOT_TAKEN }
+            message: { type: string }
+
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        db: { type: string, enum: [up, down] }
+
+    Location:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+
+    Service:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        duration_min: { type: integer }
+        price: { type: [number, "null"] }
+
+    ServiceInput:
+      type: object
+      required: [name, duration_min]
+      properties:
+        name: { type: string }
+        duration_min: { type: integer }
+        buffer_min: { type: integer }
+        price: { type: [number, "null"] }
+        deposit_amount: { type: [number, "null"] }
+        description: { type: [string, "null"] }
+        active: { type: boolean }
+        segments:
+          type: array
+          items: { type: object, properties: { minutes: { type: integer }, busy: { type: boolean } } }
+        locations:
+          type: array
+          items: { type: object, properties: { location_id: { type: integer }, price_override: { type: [number, "null"] } } }
+
+    Slot:
+      type: object
+      properties:
+        start: { type: string, format: date-time }
+        staff_id: { type: integer }
+
+    Availability:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        slots: { type: array, items: { $ref: "#/components/schemas/Slot" } }
+
+    CustomerInput:
+      type: object
+      required: [name, phone]
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        email: { type: [string, "null"] }
+
+    AppointmentInput:
+      type: object
+      required: [location_id, service_id, start, customer]
+      properties:
+        location_id: { type: integer }
+        service_id: { type: integer }
+        staff_id: { type: [integer, "null"], description: "null = sin preferencia" }
+        start: { type: string, format: date-time }
+        customer: { $ref: "#/components/schemas/CustomerInput" }
+        wa_consent: { type: boolean }
+        channel: { type: string, enum: [web, whatsapp, manual] }
+
+    AppointmentResult:
+      type: object
+      properties:
+        appointment_id: { type: integer }
+        status: { type: string }
+        staff_id: { type: integer }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        public_code: { type: string }
+        idempotent_replay: { type: boolean }
+
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string }
+        expires_at: { type: string, format: date-time }
+        user:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            email: { type: string }
+            role: { type: string, enum: [recepcion, profesional, admin_sede, admin_cadena] }
+            location_id: { type: [integer, "null"] }

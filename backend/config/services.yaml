@@ -21,6 +21,7 @@ services:
             $graphVersion: '%env(WHATSAPP_GRAPH_VERSION)%'
             $secret: '%env(APP_SECRET)%'
             $appUrl: '%env(APP_URL)%'
+            $allowedOrigins: '%env(CORS_ALLOWED_ORIGINS)%'
             $apiKey: '%env(ANTHROPIC_API_KEY)%'
             $model: '%env(ANTHROPIC_MODEL)%'
             $secretKey: '%env(STRIPE_SECRET_KEY)%'

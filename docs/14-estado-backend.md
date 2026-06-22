@@ -77,6 +77,9 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | `POST` | `/api/v1/waitlist` | Apuntarse a la lista de espera |
 | `POST` | `/api/v1/appointments/{id}/deposit` | Iniciar pago del depósito (Stripe) |
 | `GET`  | `/api/v1/calendar/{token}.ics` | Feed iCal de la agenda de un profesional |
+| `GET`  | `/api/v1/health` | Health check (app + BD) |
+
+> Contrato completo de la API en [`docs/openapi.yaml`](openapi.yaml) (OpenAPI 3.1). CORS habilitado en `/api/*` (orígenes en `CORS_ALLOWED_ORIGINS`).
 
 > Rate limiting por IP: **60/min** en alta de reserva, lookup, disponibilidad y lista de espera; **10/min** en el login del panel (anti fuerza bruta).
 
@@ -123,6 +126,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | `DATABASE_URL` | Conexión PostgreSQL |
 | `APP_SECRET` | Secreto de la app **y** firma de los JWT del panel |
 | `APP_URL` | URL pública del sitio (enlaces, p. ej. el de reset de contraseña) |
+| `CORS_ALLOWED_ORIGINS` | Orígenes permitidos por CORS (lista; `*` = cualquiera) |
 | `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | Cloud API de WhatsApp (vacío → salida al log) |
 | `WHATSAPP_APP_SECRET` | Verifica la firma del webhook de Meta (vacío → no se exige firma) |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | IA del bot (vacío → solo botones) |
@@ -160,10 +164,13 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 - **Export y borrado/anonimización** de datos de un cliente.
 
 ### 🟡 Operación / preparación para el frontend
-- **CORS** (necesario para que el navegador llame a la API).
-- **OpenAPI** (`openapi.yaml`) como contrato (doc 06 §7).
-- **Health check** (`/api/v1/health` con chequeo de BD).
-- **CI** (GitHub Actions) ejecutando los tests + análisis estático (PHPStan).
+- ✅ *Resuelto (2026-06-21):* **CORS** en `/api/*` (`CorsListener`, orígenes configurables; preflight `OPTIONS`).
+- ✅ *Resuelto (2026-06-21):* **OpenAPI** [`docs/openapi.yaml`](openapi.yaml) (OpenAPI 3.1, 45 rutas).
+- ✅ *Resuelto (2026-06-21):* **Health check** `GET /api/v1/health` (app + BD).
+- ✅ *Resuelto (2026-06-21):* **CI** (GitHub Actions): levanta Postgres, prepara la BD de test y corre lint + 38 tests en cada push/PR.
+- ⏳ Opcional: **análisis estático (PHPStan)** en CI.
+
+> Con esto el bloque 🟡 queda cubierto: el frontend ya tiene contrato (OpenAPI), CORS y health, y la CI protege cada cambio.
 
 ### ⚪ Producto (prioridad baja)
 - Valoración post-cita, fidelización/puntos, citas recurrentes, audit log de acciones del panel, i18n de mensajes.
