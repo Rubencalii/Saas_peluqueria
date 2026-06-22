@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Auth;
 
+use App\Service\Email\EmailSender;
 use Doctrine\DBAL\Connection;
-use Psr\Log\LoggerInterface;
 
 /**
  * Reset de contraseña del panel (doc 14 §9).
@@ -25,7 +25,7 @@ final class PasswordResetService
 
     public function __construct(
         private readonly Connection $db,
-        private readonly LoggerInterface $logger,
+        private readonly EmailSender $email,
         private readonly string $appUrl,
     ) {
     }
@@ -65,7 +65,12 @@ final class PasswordResetService
         });
 
         $link = rtrim($this->appUrl, '/') . '/restablecer-contrasena?token=' . $token;
-        $this->logger->info('[PasswordReset] enlace para {email}: {link}', ['email' => $email, 'link' => $link]);
+        $this->email->send(
+            $email,
+            'Restablece tu contraseña',
+            "Has solicitado restablecer tu contraseña.\n\nAbre este enlace (válido "
+            . self::TTL_MINUTES . " minutos):\n{$link}\n\nSi no fuiste tú, ignora este correo."
+        );
 
         return $token;
     }

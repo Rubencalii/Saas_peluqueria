@@ -16,13 +16,14 @@
 | API del panel: auth (JWT) + roles + agenda/citas/CRM | ✅ |
 | Configuración del panel: servicios, personal, horarios, bloqueos, sedes, branding | ✅ |
 | Notificaciones y recordatorios (confirmación, 24 h, cambio/cancelación) | ✅ |
+| Canal de email (Symfony Mailer): respaldo de notificaciones + enlace de reset | ✅ |
 | Informes: ocupación, no-shows, canal, ingresos, horas punta, retención | ✅ |
 | Backlog doc 13: anti no-show, recordatorio de retorno, lista de espera, iCal, depósito Stripe | ✅ |
 | Endurecimiento: rate limiting, errores uniformes, runner de migraciones | ✅ |
 | Seguridad: firma webhook WhatsApp, rate limit login, reset de contraseña | ✅ |
 | Operación: CORS, health check, OpenAPI, CI (GitHub Actions) | ✅ |
 | RGPD (doc 09): export, anonimización, baja de consentimiento | ✅ |
-| Suite de tests (PHPUnit) | ✅ 42 tests |
+| Suite de tests (PHPUnit) | ✅ 45 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -61,6 +62,7 @@ php bin/phpunit
 | `0006_waitlist.sql` | Lista de espera (`waitlist` + enum) |
 | `0007_staff_calendar_token.sql` | Token de feed iCal por profesional |
 | `0008_payments.sql` | Depósito por servicio + tabla `payment` |
+| `0009_password_reset.sql` | Token de reset de contraseña del panel |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -131,6 +133,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | `APP_SECRET` | Secreto de la app **y** firma de los JWT del panel |
 | `APP_URL` | URL pública del sitio (enlaces, p. ej. el de reset de contraseña) |
 | `CORS_ALLOWED_ORIGINS` | Orígenes permitidos por CORS (lista; `*` = cualquiera) |
+| `MAILER_DSN` / `MAILER_FROM` | Transporte y remitente de email (`null://` → modo log) |
 | `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | Cloud API de WhatsApp (vacío → salida al log) |
 | `WHATSAPP_APP_SECRET` | Verifica la firma del webhook de Meta (vacío → no se exige firma) |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | IA del bot (vacío → solo botones) |
@@ -146,7 +149,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**42 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
+**45 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
 
 ```bash
 cd backend && php bin/phpunit

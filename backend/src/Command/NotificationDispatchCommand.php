@@ -35,9 +35,18 @@ final class NotificationDispatchCommand extends Command
         private readonly Connection $db,
         private readonly NotificationService $notifications,
         private readonly WhatsAppMessenger $wa,
+        private readonly \App\Service\Email\EmailSender $email,
     ) {
         parent::__construct();
     }
+
+    /** Asunto del email según el tipo de notificación. */
+    private const SUBJECTS = [
+        'confirmacion' => 'Tu cita está confirmada',
+        'recordatorio' => 'Recordatorio de tu cita',
+        'cambio' => 'Novedad sobre tu cita',
+        'seguimiento' => '¡Gracias por tu visita!',
+    ];
 
     protected function configure(): void
     {
@@ -54,7 +63,7 @@ final class NotificationDispatchCommand extends Command
 
         $due = $this->db->fetchAllAssociative(
             "SELECT n.id, n.type, n.template_name, a.status AS appointment_status, a.start_at,
-                    c.name, c.phone, c.wa_consent,
+                    c.name, c.phone, c.email, c.wa_consent,
                     s.name AS service_name, l.name AS location_name, l.timezone
                FROM notification n
                JOIN appointment a ON a.id = n.appointment_id
@@ -103,16 +112,23 @@ final class NotificationDispatchCommand extends Command
             ]);
 
             $phone = (string) $n['phone'];
+            $emailAddr = $n['email'] !== null ? (string) $n['email'] : '';
             $canWhatsApp = (bool) $n['wa_consent'] && $phone !== '';
 
             if ($dryRun) {
-                $io->writeln(sprintf('[DRY] #%d %s → %s%s', $id, $type, $phone, $canWhatsApp ? '' : ' (sin consentimiento)'));
+                $via = $canWhatsApp ? 'whatsapp' : ($emailAddr !== '' ? 'email' : 'sin canal');
+                $io->writeln(sprintf('[DRY] #%d %s → %s', $id, $type, $via));
                 ++$sent;
 
                 continue;
             }
 
+            // WhatsApp como canal principal (requiere consentimiento); email de respaldo.
             $ok = $canWhatsApp && $this->wa->sendText(ltrim($phone, '+'), $body);
+            if (!$ok && $emailAddr !== '') {
+                $subject = self::SUBJECTS[$type] ?? 'Información de tu cita';
+                $ok = $this->email->send($emailAddr, $subject, $body);
+            }
 
             $this->db->executeStatement(
                 'UPDATE notification SET status = ?, sent_at = CASE WHEN ? THEN now() ELSE sent_at END WHERE id = ?',
