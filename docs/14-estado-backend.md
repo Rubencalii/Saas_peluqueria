@@ -35,7 +35,8 @@
 | Multi-tenant Fase 6 (alta de salón: `POST /api/v1/signup` → cuenta+admin+sede en trial) | ✅ |
 | Multi-tenant Fase 5 (límites de plan + cuenta suspendida en solo lectura + billing con Stripe Subscriptions) | ✅ |
 | Multi-tenant Fase 4 (Row-Level Security: red de seguridad en BD, rol de app + políticas) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 65 tests |
+| Revocación / refresh del JWT (logout en todos los dispositivos) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 66 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -83,6 +84,7 @@ php bin/phpunit
 | `0015_per_tenant_uniqueness.sql` | Multi-tenant Fase 2: unicidad por-cuenta (`location.slug`, `customer.phone`) |
 | `0016_account_wa_line.sql` | Multi-tenant Fase 3: `account.wa_phone_number_id` (línea de WhatsApp por cuenta) |
 | `0017_rls.sql` | Multi-tenant Fase 4: rol `peluqueria_app` + políticas Row-Level Security |
+| `0018_session_revocation.sql` | Revocación de sesiones del panel (`app_user.token_version`) |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -111,7 +113,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ### 5.2 Panel (requieren `Authorization: Bearer <JWT>` + rol)
 
-**Auth:** `POST /api/v1/signup` (alta de salón, público) · `POST /api/v1/auth/login` · `GET /api/v1/admin/me` · `GET /api/v1/admin/account` (cuenta + plan) · reset `POST /api/v1/auth/password/forgot` · `POST /api/v1/auth/password/reset`
+**Auth:** `POST /api/v1/signup` (alta de salón, público) · `POST /api/v1/auth/login` · `POST /api/v1/auth/refresh` (renueva token) · `POST /api/v1/admin/auth/logout` (revoca sesiones) · `GET /api/v1/admin/me` · `GET /api/v1/admin/account` (cuenta + plan) · reset `POST /api/v1/auth/password/forgot` · `POST /api/v1/auth/password/reset`
 
 **Facturación (suscripción del salón, admin_cadena):** `POST /api/v1/admin/billing/checkout` (Stripe Checkout) · `POST /api/v1/admin/billing/portal` (Customer Portal) · webhook `POST /api/v1/webhooks/stripe/billing`
 
@@ -195,9 +197,10 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 - ✅ *Resuelto (2026-06-21):* **firma del webhook de WhatsApp** (`X-Hub-Signature-256`) verificada con HMAC del app secret (degrada sin `WHATSAPP_APP_SECRET`).
 - ✅ *Resuelto (2026-06-21):* **rate limiting en el login** (`/auth/login`, 10/min por IP) contra fuerza bruta.
 - ✅ *Resuelto (2026-06-21):* se retiró el `APP_SECRET` de alta entropía de los `.env` versionados (alerta de GitGuardian) y se **purgó del historial de git** (reescritura + force-push). Los secretos reales van en `.env.local`.
-- ✅ *Resuelto (2026-06-21):* **reset de contraseña** del panel (token de un solo uso con caducidad, respuesta genérica anti-enumeración; enlace al log sin transporte de email). Opcional pendiente: **revocación/refresh** del JWT.
+- ✅ *Resuelto (2026-06-21):* **reset de contraseña** del panel (token de un solo uso con caducidad, respuesta genérica anti-enumeración; enlace al log sin transporte de email).
+- ✅ *Resuelto (2026-06-22):* **revocación y refresh del JWT** (`token_version` por usuario): `POST /api/v1/auth/refresh` renueva un token válido; `POST /api/v1/admin/auth/logout` cierra la sesión en todos los dispositivos; el cambio de contraseña también revoca las sesiones.
 
-> Con esto el bloque 🔴 de seguridad queda cubierto (salvo el refresh/revocación de JWT, opcional).
+> Con esto el bloque 🔴 de seguridad queda cubierto.
 
 ### 🟠 Cumplimiento (RGPD, doc 09)
 - ✅ *Resuelto (2026-06-21):* **export** de datos del cliente (acceso/portabilidad) y **anonimización** (derecho de supresión, conservando las citas por necesidad fiscal) — endpoints solo admin.

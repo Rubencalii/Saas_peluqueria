@@ -103,8 +103,13 @@ final class PasswordResetService
 
         $hash = password_hash($newPassword, PASSWORD_BCRYPT);
 
+        // Cambiar la contraseña revoca las sesiones abiertas (sessions_valid_from),
+        // por si el acceso estaba comprometido.
         $this->db->transactional(function (Connection $tx) use ($row, $hash): void {
-            $tx->executeStatement('UPDATE app_user SET password_hash = ? WHERE id = ?', [$hash, (int) $row['user_id']]);
+            $tx->executeStatement(
+                'UPDATE app_user SET password_hash = ?, token_version = token_version + 1 WHERE id = ?',
+                [$hash, (int) $row['user_id']]
+            );
             $tx->executeStatement('UPDATE password_reset SET used_at = now() WHERE id = ?', [(int) $row['id']]);
         });
     }

@@ -225,6 +225,24 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/Error" }
 
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renueva el token (a partir de un Bearer válido)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Nuevo token, content: { application/json: { schema: { $ref: "#/components/schemas/LoginResponse" } } } }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /api/v1/admin/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cierra la sesión en todos los dispositivos (revoca los tokens)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Error" }
+
   /api/v1/auth/password/forgot:
     post:
       tags: [Auth]

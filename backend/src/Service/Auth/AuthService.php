@@ -48,7 +48,7 @@ final class AuthService
         }
 
         $user = $this->db->fetchAssociative(
-            'SELECT id, name, email, password_hash, role, location_id, account_id, active
+            'SELECT id, name, email, password_hash, role, location_id, account_id, token_version, active
                FROM app_user WHERE email = ?',
             [$email]
         );
@@ -74,7 +74,7 @@ final class AuthService
         $exp = time() + self::TTL_SECONDS;
 
         return [
-            'token' => $this->issue($context, $exp),
+            'token' => $this->issue($context, $exp, (int) $user['token_version']),
             'expires_at' => (new \DateTimeImmutable('@' . $exp))->format('c'),
             'user' => $context,
         ];
@@ -111,6 +111,16 @@ final class AuthService
             throw new AuthException('INVALID_TOKEN', 'Rol inválido en el token.', 401);
         }
 
+        // Revocación: si la versión de token del usuario avanzó respecto a la del
+        // token, la sesión fue cerrada (logout / cambio de contraseña).
+        $currentVersion = $this->db->fetchOne(
+            'SELECT token_version FROM app_user WHERE id = ?',
+            [(int) ($claims['sub'] ?? 0)]
+        );
+        if ($currentVersion !== false && (int) ($claims['tv'] ?? 0) < (int) $currentVersion) {
+            throw new AuthException('TOKEN_REVOKED', 'La sesión ha sido cerrada, vuelve a iniciar sesión.', 401);
+        }
+
         return [
             'id' => (int) ($claims['sub'] ?? 0),
             'name' => (string) ($claims['name'] ?? ''),
@@ -119,6 +129,36 @@ final class AuthService
             'location_id' => isset($claims['loc']) ? (int) $claims['loc'] : null,
             'account_id' => (int) ($claims['acc'] ?? 0),
         ];
+    }
+
+    /**
+     * Renueva la sesión: a partir de un token válido emite otro fresco (TTL
+     * completo). El refresco respeta la revocación (verify ya la comprueba).
+     *
+     * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int}}
+     *
+     * @throws AuthException
+     */
+    public function refresh(string $token): array
+    {
+        $context = $this->verify($token); // valida firma, expiración y revocación
+        $version = (int) $this->db->fetchOne('SELECT token_version FROM app_user WHERE id = ?', [$context['id']]);
+        $exp = time() + self::TTL_SECONDS;
+
+        return [
+            'token' => $this->issue($context, $exp, $version),
+            'expires_at' => (new \DateTimeImmutable('@' . $exp))->format('c'),
+            'user' => $context,
+        ];
+    }
+
+    /**
+     * Revoca todas las sesiones del usuario: los tokens emitidos hasta ahora
+     * dejan de ser válidos (logout en todos los dispositivos).
+     */
+    public function revokeSessions(int $userId): void
+    {
+        $this->db->executeStatement('UPDATE app_user SET token_version = token_version + 1 WHERE id = ?', [$userId]);
     }
 
     /**
@@ -195,7 +235,7 @@ final class AuthService
     /**
      * @param array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int} $ctx
      */
-    private function issue(array $ctx, int $exp): string
+    private function issue(array $ctx, int $exp, int $tokenVersion): string
     {
         $header = ['alg' => 'HS256', 'typ' => 'JWT'];
         $payload = [
@@ -205,6 +245,7 @@ final class AuthService
             'role' => $ctx['role'],
             'loc' => $ctx['location_id'],
             'acc' => $ctx['account_id'],
+            'tv' => $tokenVersion,
             'iat' => time(),
             'exp' => $exp,
         ];

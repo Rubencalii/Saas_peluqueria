@@ -46,6 +46,39 @@ final class AuthController extends AbstractController
     }
 
     /**
+     * Renueva el token a partir de uno válido (Bearer). Útil para extender la
+     * sesión sin pedir credenciales otra vez.
+     */
+    #[Route('/api/v1/auth/refresh', name: 'auth_refresh', methods: ['POST'])]
+    public function refresh(Request $request): JsonResponse
+    {
+        $header = (string) $request->headers->get('Authorization', '');
+        if (!str_starts_with($header, 'Bearer ')) {
+            return $this->json(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Falta el token de acceso.']], 401);
+        }
+
+        try {
+            $result = $this->auth->refresh(substr($header, 7));
+        } catch (AuthException $e) {
+            return $this->json(['error' => ['code' => $e->errorCode, 'message' => $e->getMessage()]], $e->statusCode);
+        }
+
+        return $this->json($result);
+    }
+
+    /**
+     * Cierra la sesión en todos los dispositivos: revoca los tokens emitidos
+     * hasta ahora (incluido el actual). Ruta admin → token ya validado.
+     */
+    #[Route('/api/v1/admin/auth/logout', name: 'auth_logout', methods: ['POST'])]
+    public function logout(Request $request): JsonResponse
+    {
+        $this->auth->revokeSessions(AdminController::user($request)['id']);
+
+        return $this->json(['ok' => true]);
+    }
+
+    /**
      * Solicita un enlace de reset. Responde siempre 200 (no revela si el email
      * existe). El enlace se envía por email / se registra en el log.
      */
