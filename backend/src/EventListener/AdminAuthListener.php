@@ -61,8 +61,10 @@ final class AdminAuthListener
         }
 
         // Multi-tenant (doc 15, Fase 5): una cuenta suspendida/cancelada (p. ej. por
-        // impago) queda en SOLO LECTURA; se bloquean las escrituras con 402.
-        if (!in_array($request->getMethod(), self::READ_METHODS, true) && $this->accountSuspended($user['account_id'])) {
+        // impago) queda en SOLO LECTURA; se bloquean las escrituras con 402. Se
+        // exime la facturación: un salón impago debe poder volver a pagar.
+        $isBilling = str_starts_with($request->getPathInfo(), '/api/v1/admin/billing');
+        if (!$isBilling && !in_array($request->getMethod(), self::READ_METHODS, true) && $this->accountSuspended($user['account_id'])) {
             $event->setResponse($this->deny('ACCOUNT_SUSPENDED', 'Tu cuenta está suspendida. Regulariza la suscripción para seguir operando.', 402));
 
             return;

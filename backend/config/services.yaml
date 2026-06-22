@@ -26,6 +26,7 @@ services:
             $model: '%env(ANTHROPIC_MODEL)%'
             $secretKey: '%env(STRIPE_SECRET_KEY)%'
             $webhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+            $billingWebhookSecret: '%env(STRIPE_BILLING_WEBHOOK_SECRET)%'
             $dsn: '%env(MAILER_DSN)%'
             $from: '%env(MAILER_FROM)%'
             $publicApiLimiter: '@limiter.public_api'

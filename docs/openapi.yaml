@@ -265,6 +265,31 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
 
+  /api/v1/admin/billing/checkout:
+    post:
+      tags: [Panel]
+      summary: Inicia el alta/cambio de suscripción (Stripe Checkout) — admin_cadena
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [plan_code], properties: { plan_code: { type: string } } } } }
+      responses:
+        "200": { description: "URL de Checkout", content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } } }
+        "402": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { description: "Facturación desactivada" }
+
+  /api/v1/admin/billing/portal:
+    post:
+      tags: [Panel]
+      summary: Abre el Customer Portal de Stripe para gestionar la suscripción — admin_cadena
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: "URL del portal", content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } } }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { description: "Facturación desactivada" }
+
   /api/v1/admin/agenda:
     get:
       tags: [Panel]
@@ -601,8 +626,14 @@ paths:
   /api/v1/webhooks/stripe:
     post:
       tags: [Webhooks]
-      summary: "Confirmación de pago (firma Stripe-Signature)"
+      summary: "Confirmación de pago del depósito (firma Stripe-Signature)"
       responses: { "200": { description: OK }, "400": { description: Firma inválida } }
+
+  /api/v1/webhooks/stripe/billing:
+    post:
+      tags: [Webhooks]
+      summary: "Suscripción del SaaS: sincroniza estado de cuenta/plan (firma propia)"
+      responses: { "200": { description: OK }, "400": { description: Firma inválida }, "503": { description: Desactivado } }
 
 components:
   securitySchemes:

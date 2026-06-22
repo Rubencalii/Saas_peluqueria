@@ -4,9 +4,9 @@
 > (Symfony 7 + PHP 8.5, Doctrine DBAL sobre PostgreSQL) y backlog técnico
 > pendiente. El backend está **completo**: núcleo + backlog del doc 13 +
 > endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 57 tests).
-> En curso, el **multi-tenant** (doc 15): Fases 1-3 y 6 hechas y la 5 parcial
-> (cimientos, aislamiento del panel, público/bot por tenant, alta de salón y
-> límites de plan). Falta la **Fase 4 (RLS)** y el **billing con Stripe** (Fase 5).
+> En curso, el **multi-tenant** (doc 15): Fases 1-3, 5 y 6 hechas (cimientos,
+> aislamiento del panel, público/bot por tenant, límites de plan + billing con
+> Stripe, y alta de salón). Falta solo la **Fase 4 (RLS)** como red de seguridad.
 > Lo que queda del proyecto, además, es el **frontend**.
 
 ## 1. Resumen
@@ -33,8 +33,8 @@
 | Multi-tenant Fase 2 (aislamiento del panel: unicidad por-cuenta + scoping de todas las consultas del panel) | ✅ |
 | Multi-tenant Fase 3 (público por subdominio + bot por línea de WhatsApp; cliente en la cuenta de la sede) | ✅ |
 | Multi-tenant Fase 6 (alta de salón: `POST /api/v1/signup` → cuenta+admin+sede en trial) | ✅ |
-| Multi-tenant Fase 5 parcial (límites de plan + cuenta suspendida en solo lectura) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 61 tests |
+| Multi-tenant Fase 5 (límites de plan + cuenta suspendida en solo lectura + billing con Stripe Subscriptions) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 64 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -111,6 +111,8 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 **Auth:** `POST /api/v1/signup` (alta de salón, público) · `POST /api/v1/auth/login` · `GET /api/v1/admin/me` · `GET /api/v1/admin/account` (cuenta + plan) · reset `POST /api/v1/auth/password/forgot` · `POST /api/v1/auth/password/reset`
 
+**Facturación (suscripción del salón, admin_cadena):** `POST /api/v1/admin/billing/checkout` (Stripe Checkout) · `POST /api/v1/admin/billing/portal` (Customer Portal) · webhook `POST /api/v1/webhooks/stripe/billing`
+
 | Área | Endpoints |
 |------|-----------|
 | Agenda | `GET /admin/agenda` (día/semana por sede) |
@@ -163,6 +165,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | `WHATSAPP_APP_SECRET` | Verifica la firma del webhook de Meta (vacío → no se exige firma) |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | IA del bot (vacío → solo botones) |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Depósitos (vacío → pagos desactivados) |
+| `STRIPE_BILLING_WEBHOOK_SECRET` | Webhook de la suscripción del SaaS (reutiliza `STRIPE_SECRET_KEY`) |
 
 > **Degradación**: WhatsApp, IA y Stripe se **desactivan solos** si no hay credenciales, así que el backend funciona en local sin cuentas externas.
 
@@ -174,7 +177,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**60 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña, RGPD y el cliente creado en la cuenta de la sede), y tests **funcionales HTTP** de multi-tenant (aislamiento del panel, resolución del público por subdominio y alta de salón con límite de plan).
+**64 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña, RGPD, el cliente creado en la cuenta de la sede y la facturación: impago→suspende, pago→reactiva, alta de suscripción), y tests **funcionales HTTP** de multi-tenant (aislamiento del panel, resolución del público por subdominio, alta de salón con límite de plan y cuenta suspendida en solo lectura).
 
 ```bash
 cd backend && php bin/phpunit

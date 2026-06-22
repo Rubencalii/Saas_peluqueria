@@ -1,6 +1,6 @@
 # 15 · Plan: Multi-tenant + Suscripciones (SaaS multi-salón)
 
-> **Estado: Fases 1-3 y 6 implementadas + Fase 5 parcial (límites de plan); falta la Fase 4 (RLS) y el billing con Stripe.** Hoy el sistema es **mono-cadena**: un
+> **Estado: Fases 1-3, 5 y 6 implementadas; falta solo la Fase 4 (RLS) como red de seguridad.** Hoy el sistema es **mono-cadena**: un
 > único negocio con varias sedes. Para venderlo como SaaS a **muchos salones
 > independientes** hay que añadir aislamiento por inquilino (tenant) y
 > facturación del propio software. Es un cambio arquitectónico que toca casi
@@ -112,7 +112,7 @@ plan `free`/trial. Email de bienvenida (canal de email ya existe).
 | **2. Scoping panel** ✅ | `0015`: unicidades por-cuenta (`location.slug`, `customer.phone`; el email de `app_user` se mantiene global). **Todas** las consultas del panel filtran por `account_id` del JWT (CRUD raíz, agenda, citas, informes, conversaciones, lista de espera, bloqueos, valoraciones, recurrencias, auditoría); `assertLocationAccount()` impide que admin_cadena alcance sedes de otra cuenta. Test funcional de aislamiento. | **Hecho** |
 | **3. Público multi-tenant** ✅ | `TenantResolver` resuelve la web por subdominio; `0016` añade `account.wa_phone_number_id` y el webhook resuelve el bot por la línea de Meta. El catálogo y los endpoints públicos (disponibilidad, reserva, lista de espera) se acotan a la cuenta; el cliente se crea en la cuenta de la sede. Test funcional de subdominio. | **Hecho** |
 | **4. RLS** | Políticas Row-Level Security como red de seguridad. | Medio |
-| **5. Billing** 🟡 | **Hecho** los límites de plan (`PlanLimitService`: rechaza crear sede/profesional por encima del plan, 402) y el estado **cuenta suspendida ⇒ solo lectura** (el `AdminAuthListener` bloquea las escrituras con 402). **Falta** Stripe Billing + webhook que ponga la cuenta en `suspended`/`active`. | Medio |
+| **5. Billing** ✅ | Límites de plan (`PlanLimitService`, 402), **cuenta suspendida ⇒ solo lectura** (el `AdminAuthListener` bloquea escrituras con 402, salvo `/admin/billing`), y **Stripe Billing** (`BillingService`): Checkout para alta/cambio de plan, Customer Portal y webhook propio (`/webhooks/stripe/billing`) que sincroniza `subscription.status` y `account.status` (impago→suspende, pago→reactiva). Degrada sin claves. | **Hecho** |
 | **6. Onboarding** ✅ | `POST /api/v1/signup` crea cuenta (`trial`) + suscripción `free` + primera sede + admin (`admin_cadena`), email de bienvenida y sesión. Test funcional. **Falta** el portal de cliente de Stripe (con el billing). | **Hecho** |
 
 Cada fase es un PR independiente con su batería de tests. La fase 2 es la
