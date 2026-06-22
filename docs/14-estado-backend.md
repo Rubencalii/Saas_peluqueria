@@ -2,8 +2,9 @@
 
 > Actualización a **2026-06-21**. Inventario de lo implementado en `backend/`
 > (Symfony 7 + PHP 8.5, Doctrine DBAL sobre PostgreSQL) y backlog técnico
-> pendiente. El backend está **completo a nivel de funcionalidad de producto**
-> (núcleo + backlog del doc 13); lo que queda es endurecimiento y frontend.
+> pendiente. El backend está **completo**: núcleo + backlog del doc 13 +
+> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 50 tests).
+> Lo que queda del proyecto es el **frontend**.
 
 ## 1. Resumen
 
@@ -23,7 +24,7 @@
 | Seguridad: firma webhook WhatsApp, rate limit login, reset de contraseña | ✅ |
 | Operación: CORS, health check, OpenAPI, CI (GitHub Actions) | ✅ |
 | RGPD (doc 09): export, anonimización, baja de consentimiento | ✅ |
-| Suite de tests (PHPUnit) | ✅ 45 tests |
+| Suite de tests (PHPUnit) | ✅ 50 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -64,6 +65,7 @@ php bin/phpunit
 | `0008_payments.sql` | Depósito por servicio + tabla `payment` |
 | `0009_password_reset.sql` | Token de reset de contraseña del panel |
 | `0010_audit_log.sql` | Registro de actividad del panel (auditoría) |
+| `0011_reviews.sql` | Valoraciones post-cita |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -84,6 +86,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | `POST` | `/api/v1/appointments/{id}/deposit` | Iniciar pago del depósito (Stripe) |
 | `GET`  | `/api/v1/calendar/{token}.ics` | Feed iCal de la agenda de un profesional |
 | `GET`  | `/api/v1/health` | Health check (app + BD) |
+| `POST` | `/api/v1/appointments/{id}/review` | Valorar una cita completada (código) |
 
 > Contrato completo de la API en [`docs/openapi.yaml`](openapi.yaml) (OpenAPI 3.1). CORS habilitado en `/api/*` (orígenes en `CORS_ALLOWED_ORIGINS`).
 
@@ -108,6 +111,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | Lista de espera | `GET /admin/waitlist` · `DELETE /admin/waitlist/{id}` |
 | Informes | `GET /admin/reports/{occupancy,no-shows,bookings-by-channel,revenue,peak-hours,retention,no-show-customers}` |
 | Auditoría | `GET /admin/audit` (registro de actividad, solo admin_cadena) |
+| Valoraciones | `GET /admin/reviews` (paginado) · `GET /admin/reports/ratings` (nota media por profesional/servicio) |
 
 **Roles:** `recepcion`, `profesional`, `admin_sede`, `admin_cadena` (autorización por sede; el catálogo y las sedes los gobierna `admin_cadena`).
 
@@ -153,7 +157,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**45 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
+**50 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
 
 ```bash
 cd backend && php bin/phpunit
@@ -186,7 +190,8 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 
 ### ⚪ Producto (prioridad baja)
 - ✅ *Resuelto (2026-06-21):* **audit log** de acciones del panel (listener en `kernel.terminate` → tabla `audit_log`; consulta en `GET /admin/audit`).
-- Pendiente: valoración post-cita, fidelización/puntos, citas recurrentes, i18n de mensajes.
+- ✅ *Resuelto (2026-06-21):* **valoración post-cita** (envío público por código + lista y agregados en el panel).
+- Pendiente: fidelización/puntos, citas recurrentes, i18n de mensajes.
 
 ### Frontend (fuera de backend)
 - **Panel de administración** y **web pública de reserva** (consumen esta API).
