@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Service\AvailabilityService;
+use App\Service\Tenant\TenantResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -12,8 +13,10 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class AvailabilityController extends AbstractController
 {
-    public function __construct(private readonly AvailabilityService $availability)
-    {
+    public function __construct(
+        private readonly AvailabilityService $availability,
+        private readonly TenantResolver $tenant,
+    ) {
     }
 
     #[Route('/api/v1/availability', name: 'availability', methods: ['GET'])]
@@ -30,6 +33,11 @@ final class AvailabilityController extends AbstractController
                 ['error' => ['code' => 'VALIDATION', 'message' => 'Parámetros requeridos: location_id, service_id, date.']],
                 400
             );
+        }
+
+        // Multi-tenant: la sede debe ser de la cuenta del subdominio.
+        if (!$this->tenant->locationInAccount($request, $locationId)) {
+            return $this->json(['error' => ['code' => 'NOT_FOUND', 'message' => 'Sede no encontrada.']], 404);
         }
 
         try {

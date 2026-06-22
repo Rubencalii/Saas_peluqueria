@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Service\AppointmentException;
 use App\Service\AppointmentService;
+use App\Service\Tenant\TenantResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -16,8 +17,10 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class AppointmentController extends AbstractController
 {
-    public function __construct(private readonly AppointmentService $appointments)
-    {
+    public function __construct(
+        private readonly AppointmentService $appointments,
+        private readonly TenantResolver $tenant,
+    ) {
     }
 
     #[Route('/api/v1/appointments', name: 'appointment_create', methods: ['POST'])]
@@ -26,6 +29,11 @@ final class AppointmentController extends AbstractController
         $payload = json_decode($request->getContent(), true);
         if (!is_array($payload)) {
             return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
+        }
+
+        // Multi-tenant: la sede debe ser de la cuenta del subdominio.
+        if (!$this->tenant->locationInAccount($request, (int) ($payload['location_id'] ?? 0))) {
+            return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);
         }
 
         $idempotencyKey = $request->headers->get('Idempotency-Key');

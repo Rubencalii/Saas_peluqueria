@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Service\Tenant\TenantResolver;
 use App\Service\Waitlist\WaitlistException;
 use App\Service\Waitlist\WaitlistService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -17,8 +18,10 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class WaitlistController extends AbstractController
 {
-    public function __construct(private readonly WaitlistService $waitlist)
-    {
+    public function __construct(
+        private readonly WaitlistService $waitlist,
+        private readonly TenantResolver $tenant,
+    ) {
     }
 
     #[Route('/api/v1/waitlist', name: 'waitlist_join', methods: ['POST'])]
@@ -27,6 +30,11 @@ final class WaitlistController extends AbstractController
         $payload = json_decode($request->getContent(), true);
         if (!is_array($payload)) {
             return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
+        }
+
+        // Multi-tenant: la sede debe ser de la cuenta del subdominio.
+        if (!$this->tenant->locationInAccount($request, (int) ($payload['location_id'] ?? 0))) {
+            return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);
         }
 
         $customer = is_array($payload['customer'] ?? null) ? $payload['customer'] : [];
