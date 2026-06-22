@@ -60,15 +60,14 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - **Fase 3** ✅ público multi-tenant: la web resuelve la cuenta por **subdominio** (`TenantResolver`) y el bot por la **línea de WhatsApp** (`account.wa_phone_number_id` + `phone_number_id` del webhook); el catálogo y los endpoints públicos se acotan a la cuenta y el cliente se crea en la cuenta de la sede
   - **Fase 6** ✅ alta de salón: `POST /api/v1/signup` crea cuenta (`trial`) + suscripción `free` + primera sede + administrador y devuelve sesión (email de bienvenida best-effort)
   - **Fase 5** ✅ planes y facturación: **límites de plan** (`PlanLimitService`, 402), **cuenta suspendida ⇒ solo lectura** (escrituras del panel devuelven 402, salvo facturación) y **billing con Stripe** (`BillingService`: Checkout para alta/cambio de plan, Customer Portal y webhook propio que sincroniza estado de cuenta/suscripción — impago suspende, pago reactiva). Degrada sin claves
-  - ⏳ Pendiente: **Fase 4 (RLS)** como red de seguridad en BD
+  - **Fase 4** ✅ Row-Level Security (red de seguridad en BD): rol `peluqueria_app` sin BYPASSRLS + políticas en las tablas raíz; `TenantSessionListener` fija `app.account_id` por petición. Es *opt-in* (la web se conecta como ese rol vía `DATABASE_URL`; migraciones/cron siguen con el owner). Test dedicado que prueba el aislamiento a nivel de BD
 
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
-- ⏳ Multi-tenant Fase 4 (RLS), única fase que falta
 
-> El **backend mono-cadena está funcionalmente completo** (núcleo + todo el backlog del doc 13) y el **multi-tenant** está casi completo (Fases 1-3, 5 y 6): panel y público aislados por cuenta, alta de salón y facturación operativas; solo falta la Fase 4 (RLS). Lo que queda del proyecto es el **frontend**.
+> El **backend está funcionalmente completo** (núcleo + backlog del doc 13) y el **multi-tenant está completo** (Fases 1-6, doc 15): panel y público aislados por cuenta, alta de salón, facturación con Stripe y RLS como red de seguridad. Lo único que queda del proyecto es el **frontend**.
 
 ## Arranque rápido (base de datos)
 

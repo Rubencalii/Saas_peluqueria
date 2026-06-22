@@ -4,10 +4,10 @@
 > (Symfony 7 + PHP 8.5, Doctrine DBAL sobre PostgreSQL) y backlog técnico
 > pendiente. El backend está **completo**: núcleo + backlog del doc 13 +
 > endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 57 tests).
-> En curso, el **multi-tenant** (doc 15): Fases 1-3, 5 y 6 hechas (cimientos,
+> El **multi-tenant** (doc 15) está **completo** (Fases 1-6): cimientos,
 > aislamiento del panel, público/bot por tenant, límites de plan + billing con
-> Stripe, y alta de salón). Falta solo la **Fase 4 (RLS)** como red de seguridad.
-> Lo que queda del proyecto, además, es el **frontend**.
+> Stripe, alta de salón y Row-Level Security como red de seguridad en BD. Lo que
+> queda del proyecto es el **frontend**.
 
 ## 1. Resumen
 
@@ -34,7 +34,8 @@
 | Multi-tenant Fase 3 (público por subdominio + bot por línea de WhatsApp; cliente en la cuenta de la sede) | ✅ |
 | Multi-tenant Fase 6 (alta de salón: `POST /api/v1/signup` → cuenta+admin+sede en trial) | ✅ |
 | Multi-tenant Fase 5 (límites de plan + cuenta suspendida en solo lectura + billing con Stripe Subscriptions) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 64 tests |
+| Multi-tenant Fase 4 (Row-Level Security: red de seguridad en BD, rol de app + políticas) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 65 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -81,6 +82,7 @@ php bin/phpunit
 | `0014_multitenant_foundations.sql` | Multi-tenant Fase 1: `account`/`plan`/`subscription` + `account_id` |
 | `0015_per_tenant_uniqueness.sql` | Multi-tenant Fase 2: unicidad por-cuenta (`location.slug`, `customer.phone`) |
 | `0016_account_wa_line.sql` | Multi-tenant Fase 3: `account.wa_phone_number_id` (línea de WhatsApp por cuenta) |
+| `0017_rls.sql` | Multi-tenant Fase 4: rol `peluqueria_app` + políticas Row-Level Security |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -169,6 +171,8 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 > **Degradación**: WhatsApp, IA y Stripe se **desactivan solos** si no hay credenciales, así que el backend funciona en local sin cuentas externas.
 
+> **RLS (red de seguridad, Fase 4)**: las políticas están activas pero el OWNER las ignora. Para activarlas en producción, conecta la app como el rol `peluqueria_app` (cambia el usuario de `DATABASE_URL`); el `TenantSessionListener` fija `app.account_id` en cada petición. **Migraciones y cron deben seguir con el owner** (cruzan tenants). En dev/test se usa el owner, así que RLS queda inerte salvo en el test dedicado que conecta como el rol restringido.
+
 ### Gestión de secretos
 
 - Los archivos versionados (`.env`, `.env.dev`, `.env.test`) contienen **solo marcadores**, nunca secretos reales.
@@ -177,7 +181,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**64 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña, RGPD, el cliente creado en la cuenta de la sede y la facturación: impago→suspende, pago→reactiva, alta de suscripción), y tests **funcionales HTTP** de multi-tenant (aislamiento del panel, resolución del público por subdominio, alta de salón con límite de plan y cuenta suspendida en solo lectura).
+**65 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña, RGPD, el cliente creado en la cuenta de la sede, la facturación —impago→suspende, pago→reactiva, alta de suscripción— y las **políticas RLS** conectando como el rol restringido), y tests **funcionales HTTP** de multi-tenant (aislamiento del panel, resolución del público por subdominio, alta de salón con límite de plan y cuenta suspendida en solo lectura).
 
 ```bash
 cd backend && php bin/phpunit

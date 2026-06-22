@@ -54,16 +54,8 @@ jobs:
           PGPASSWORD: peluqueria
         run: |
           psql -h 127.0.0.1 -U peluqueria -d peluqueria -c "CREATE DATABASE peluqueria_test;"
-          for f in db/migrations/0001_init.sql \
-                   db/migrations/0002_overlap_protection.sql \
-                   db/migrations/0003_idempotency.sql \
-                   db/migrations/0004_appointment_public_code.sql \
-                   db/migrations/0005_whatsapp_conversation.sql \
-                   db/migrations/0006_waitlist.sql \
-                   db/migrations/0007_staff_calendar_token.sql \
-                   db/migrations/0008_payments.sql \
-                   db/migrations/0009_password_reset.sql \
-                   db/seed.sql; do
+          # Todas las migraciones en orden (están numeradas 0001..NNNN) y luego el seed.
+          for f in $(ls db/migrations/*.sql | sort) db/seed.sql; do
             psql -h 127.0.0.1 -U peluqueria -d peluqueria_test -v ON_ERROR_STOP=1 -q -f "$f"
           done
 
