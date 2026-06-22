@@ -58,15 +58,17 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - **Fase 1** ✅ cimientos: tablas `account`/`plan`/`subscription`, cuenta `principal` con los datos actuales, `account_id` en las tablas raíz y en el JWT, `GET /api/v1/admin/account`
   - **Fase 2** ✅ aislamiento del panel: unicidad por-cuenta (`location.slug`, `customer.phone`) y scoping por `account_id` de **todas** las consultas del panel, con test funcional de aislamiento
   - **Fase 3** ✅ público multi-tenant: la web resuelve la cuenta por **subdominio** (`TenantResolver`) y el bot por la **línea de WhatsApp** (`account.wa_phone_number_id` + `phone_number_id` del webhook); el catálogo y los endpoints públicos se acotan a la cuenta y el cliente se crea en la cuenta de la sede
-  - ⏳ Pendiente: RLS (red de seguridad en BD), billing (Stripe Subscriptions + límites de plan) y onboarding/signup
+  - **Fase 6** ✅ alta de salón: `POST /api/v1/signup` crea cuenta (`trial`) + suscripción `free` + primera sede + administrador y devuelve sesión (email de bienvenida best-effort)
+  - **Fase 5** 🟡 parcial: **límites de plan** (`PlanLimitService` rechaza crear sede/profesional por encima del plan, 402); falta el billing con Stripe (Subscriptions + webhook + cuenta suspendida por impago)
+  - ⏳ Pendiente: RLS (red de seguridad en BD) y billing con Stripe
 
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
-- ⏳ Multi-tenant Fases 4-6 (RLS/billing/onboarding, doc 15)
+- ⏳ Multi-tenant Fase 4 (RLS) y billing con Stripe (resto de Fase 5)
 
-> El **backend mono-cadena está funcionalmente completo** (núcleo + todo el backlog del doc 13) y el **multi-tenant** avanza por fases (1-3 hechas: panel y público aislados por cuenta). Lo que queda es **frontend** y las fases de multi-tenant RLS/billing/onboarding.
+> El **backend mono-cadena está funcionalmente completo** (núcleo + todo el backlog del doc 13) y el **multi-tenant** avanza por fases (1-3 y 6 hechas + límites de plan): panel y público aislados por cuenta y alta de salón operativa. Lo que queda es **frontend**, RLS y el billing con Stripe.
 
 ## Arranque rápido (base de datos)
 

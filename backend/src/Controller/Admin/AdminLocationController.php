@@ -6,6 +6,7 @@ namespace App\Controller\Admin;
 
 use App\Service\Auth\AuthException;
 use App\Service\Auth\AuthService;
+use App\Service\Tenant\PlanLimitService;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -23,6 +24,7 @@ final class AdminLocationController extends AdminController
     public function __construct(
         private readonly Connection $db,
         private readonly AuthService $auth,
+        private readonly PlanLimitService $planLimit,
     ) {
     }
 
@@ -70,6 +72,9 @@ final class AdminLocationController extends AdminController
             return $this->error('VALIDATION', 'name y slug son obligatorios.', 400);
         }
         $accountId = self::user($request)['account_id'];
+        if ($this->planLimit->locationLimitReached($accountId)) {
+            return $this->error('PLAN_LIMIT', 'Tu plan no permite más sedes. Mejóralo para añadir otra.', 402);
+        }
         if ($this->db->fetchOne('SELECT 1 FROM location WHERE slug = ? AND account_id = ?', [$slug, $accountId]) !== false) {
             return $this->error('CONFLICT', 'Ya existe una sede con ese slug.', 409);
         }

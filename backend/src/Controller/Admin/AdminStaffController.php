@@ -6,6 +6,7 @@ namespace App\Controller\Admin;
 
 use App\Service\Auth\AuthException;
 use App\Service\Auth\AuthService;
+use App\Service\Tenant\PlanLimitService;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,6 +27,7 @@ final class AdminStaffController extends AdminController
     public function __construct(
         private readonly Connection $db,
         private readonly AuthService $auth,
+        private readonly PlanLimitService $planLimit,
     ) {
     }
 
@@ -88,6 +90,9 @@ final class AdminStaffController extends AdminController
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
             return $this->error('VALIDATION', 'El nombre es obligatorio.', 400);
+        }
+        if ($this->planLimit->staffLimitReached($user['account_id'])) {
+            return $this->error('PLAN_LIMIT', 'Tu plan no permite más profesionales. Mejóralo para añadir otro.', 402);
         }
 
         // Un admin_sede sólo puede asignar a su propia sede.

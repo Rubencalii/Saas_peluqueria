@@ -180,6 +180,39 @@ paths:
         "404": { description: Token no válido }
 
   # ---------------------------------------------------------------- Auth
+  /api/v1/signup:
+    post:
+      tags: [Auth]
+      summary: Alta de un salón (multi-tenant) — crea cuenta + admin + sede y devuelve sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [business_name, slug, admin, location]
+              properties:
+                business_name: { type: string }
+                slug: { type: string, description: "Identificador del salón (subdominio)" }
+                admin:
+                  type: object
+                  required: [name, email, password]
+                  properties:
+                    name: { type: string }
+                    email: { type: string }
+                    password: { type: string, minLength: 8 }
+                location:
+                  type: object
+                  required: [name]
+                  properties:
+                    name: { type: string }
+                    slug: { type: string }
+                    timezone: { type: string }
+      responses:
+        "201": { description: Cuenta creada + sesión, content: { application/json: { schema: { $ref: "#/components/schemas/LoginResponse" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
   /api/v1/auth/login:
     post:
       tags: [Auth]

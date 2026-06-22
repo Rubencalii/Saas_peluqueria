@@ -4,9 +4,10 @@
 > (Symfony 7 + PHP 8.5, Doctrine DBAL sobre PostgreSQL) y backlog técnico
 > pendiente. El backend está **completo**: núcleo + backlog del doc 13 +
 > endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 57 tests).
-> En curso, el **multi-tenant** (doc 15): Fases 1-3 hechas (cimientos + aislamiento
-> del panel + público por subdominio y bot por línea de WhatsApp). Lo que queda del
-> proyecto es el **frontend** y las fases de multi-tenant RLS/billing/onboarding.
+> En curso, el **multi-tenant** (doc 15): Fases 1-3 y 6 hechas y la 5 parcial
+> (cimientos, aislamiento del panel, público/bot por tenant, alta de salón y
+> límites de plan). Falta la **Fase 4 (RLS)** y el **billing con Stripe** (Fase 5).
+> Lo que queda del proyecto, además, es el **frontend**.
 
 ## 1. Resumen
 
@@ -31,7 +32,9 @@
 | Multi-tenant Fase 1 (cimientos: cuenta/plan/suscripción, JWT con account_id) | ✅ |
 | Multi-tenant Fase 2 (aislamiento del panel: unicidad por-cuenta + scoping de todas las consultas del panel) | ✅ |
 | Multi-tenant Fase 3 (público por subdominio + bot por línea de WhatsApp; cliente en la cuenta de la sede) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 59 tests |
+| Multi-tenant Fase 6 (alta de salón: `POST /api/v1/signup` → cuenta+admin+sede en trial) | ✅ |
+| Multi-tenant Fase 5 parcial (límites de plan: rechaza crear sede/profesional por encima del plan) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 60 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -106,7 +109,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ### 5.2 Panel (requieren `Authorization: Bearer <JWT>` + rol)
 
-**Auth:** `POST /api/v1/auth/login` · `GET /api/v1/admin/me` · `GET /api/v1/admin/account` (cuenta + plan) · reset `POST /api/v1/auth/password/forgot` · `POST /api/v1/auth/password/reset`
+**Auth:** `POST /api/v1/signup` (alta de salón, público) · `POST /api/v1/auth/login` · `GET /api/v1/admin/me` · `GET /api/v1/admin/account` (cuenta + plan) · reset `POST /api/v1/auth/password/forgot` · `POST /api/v1/auth/password/reset`
 
 | Área | Endpoints |
 |------|-----------|
@@ -171,7 +174,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**59 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña, RGPD y el cliente creado en la cuenta de la sede), y tests **funcionales HTTP** de multi-tenant (aislamiento del panel y resolución del público por subdominio).
+**60 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña, RGPD y el cliente creado en la cuenta de la sede), y tests **funcionales HTTP** de multi-tenant (aislamiento del panel, resolución del público por subdominio y alta de salón con límite de plan).
 
 ```bash
 cd backend && php bin/phpunit
