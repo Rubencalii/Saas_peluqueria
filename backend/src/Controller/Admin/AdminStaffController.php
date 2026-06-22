@@ -45,12 +45,14 @@ final class AdminStaffController extends AdminController
                 'SELECT s.id, s.name, s.email, s.phone, s.active
                    FROM staff s
                    JOIN staff_location sl ON sl.staff_id = s.id AND sl.location_id = ?
+                  WHERE s.account_id = ?
                   ORDER BY s.name',
-                [$locationId]
+                [$locationId, $user['account_id']]
             );
         } else {
             $rows = $this->db->fetchAllAssociative(
-                'SELECT id, name, email, phone, active FROM staff ORDER BY name'
+                'SELECT id, name, email, phone, active FROM staff WHERE account_id = ? ORDER BY name',
+                [$user['account_id']]
             );
         }
 
@@ -103,18 +105,19 @@ final class AdminStaffController extends AdminController
             }
         }
 
-        $id = $this->db->transactional(function (Connection $tx) use ($payload, $name, $locationIds): int {
+        $accountId = $user['account_id'];
+        $id = $this->db->transactional(function (Connection $tx) use ($payload, $name, $locationIds, $accountId): int {
             $sid = (int) $tx->fetchOne(
-                'INSERT INTO staff (name, email, phone, active) VALUES (?, ?, ?, COALESCE(?, TRUE)) RETURNING id',
+                'INSERT INTO staff (account_id, name, email, phone, active) VALUES (?, ?, ?, ?, COALESCE(?, TRUE)) RETURNING id',
                 [
-                    $name,
+                    $accountId, $name,
                     isset($payload['email']) && $payload['email'] !== '' ? (string) $payload['email'] : null,
                     isset($payload['phone']) && $payload['phone'] !== '' ? (string) $payload['phone'] : null,
                     isset($payload['active']) ? (bool) $payload['active'] : null,
                 ]
             );
-            $this->replaceLinks($tx, 'staff_location', 'location_id', $sid, $locationIds);
-            $this->replaceLinks($tx, 'staff_service', 'service_id', $sid, $this->normalizeIds($payload['service_ids'] ?? []));
+            $this->replaceLinks($tx, 'staff_location', 'location_id', $sid, $accountId, $locationIds);
+            $this->replaceLinks($tx, 'staff_service', 'service_id', $sid, $accountId, $this->normalizeIds($payload['service_ids'] ?? []));
 
             return $sid;
         });
@@ -136,7 +139,7 @@ final class AdminStaffController extends AdminController
         if (!is_array($payload)) {
             return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
         }
-        if (!$this->staffExists($id)) {
+        if (!$this->staffExists($id, $user['account_id'])) {
             return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
         }
         if (($denied = $this->assertManagesStaff($user, $id)) !== null) {
@@ -158,16 +161,18 @@ final class AdminStaffController extends AdminController
             }
         }
 
-        $this->db->transactional(function (Connection $tx) use ($id, $sets, $params, $payload): void {
+        $accountId = $user['account_id'];
+        $this->db->transactional(function (Connection $tx) use ($id, $sets, $params, $payload, $accountId): void {
             if ($sets !== []) {
                 $params[] = $id;
-                $tx->executeStatement('UPDATE staff SET ' . implode(', ', $sets) . ' WHERE id = ?', $params);
+                $params[] = $accountId;
+                $tx->executeStatement('UPDATE staff SET ' . implode(', ', $sets) . ' WHERE id = ? AND account_id = ?', $params);
             }
             if (array_key_exists('location_ids', $payload)) {
-                $this->replaceLinks($tx, 'staff_location', 'location_id', $id, $this->normalizeIds($payload['location_ids']));
+                $this->replaceLinks($tx, 'staff_location', 'location_id', $id, $accountId, $this->normalizeIds($payload['location_ids']));
             }
             if (array_key_exists('service_ids', $payload)) {
-                $this->replaceLinks($tx, 'staff_service', 'service_id', $id, $this->normalizeIds($payload['service_ids']));
+                $this->replaceLinks($tx, 'staff_service', 'service_id', $id, $accountId, $this->normalizeIds($payload['service_ids']));
             }
         });
 
@@ -183,7 +188,7 @@ final class AdminStaffController extends AdminController
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
-        if (!$this->staffExists($id)) {
+        if (!$this->staffExists($id, $user['account_id'])) {
             return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
         }
 
@@ -215,7 +220,7 @@ final class AdminStaffController extends AdminController
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
-        if (!$this->staffExists($id)) {
+        if (!$this->staffExists($id, $user['account_id'])) {
             return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
         }
 
@@ -231,6 +236,9 @@ final class AdminStaffController extends AdminController
             $this->auth->assertLocation($user, $locationId);
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+        if ($this->db->fetchOne('SELECT 1 FROM location WHERE id = ? AND account_id = ?', [$locationId, $user['account_id']]) === false) {
+            return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);
         }
 
         $entries = is_array($payload['entries'] ?? null) ? $payload['entries'] : [];
@@ -278,7 +286,7 @@ final class AdminStaffController extends AdminController
             return $denied;
         }
 
-        $token = $this->db->fetchOne('SELECT calendar_token FROM staff WHERE id = ?', [$id]);
+        $token = $this->db->fetchOne('SELECT calendar_token FROM staff WHERE id = ? AND account_id = ?', [$id, $user['account_id']]);
         if ($token === false) {
             return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
         }
@@ -298,7 +306,7 @@ final class AdminStaffController extends AdminController
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
-        if (!$this->staffExists($id)) {
+        if (!$this->staffExists($id, $user['account_id'])) {
             return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
         }
         if (($denied = $this->assertManagesStaff($user, $id)) !== null) {
@@ -306,7 +314,7 @@ final class AdminStaffController extends AdminController
         }
 
         $token = bin2hex(random_bytes(16));
-        $this->db->executeStatement('UPDATE staff SET calendar_token = ? WHERE id = ?', [$token, $id]);
+        $this->db->executeStatement('UPDATE staff SET calendar_token = ? WHERE id = ? AND account_id = ?', [$token, $id, $user['account_id']]);
 
         return $this->json(['feed_url' => $this->feedUrl($request, $token)]);
     }
@@ -337,18 +345,26 @@ final class AdminStaffController extends AdminController
         return null;
     }
 
-    private function staffExists(int $id): bool
+    private function staffExists(int $id, int $accountId): bool
     {
-        return $this->db->fetchOne('SELECT 1 FROM staff WHERE id = ?', [$id]) !== false;
+        return $this->db->fetchOne('SELECT 1 FROM staff WHERE id = ? AND account_id = ?', [$id, $accountId]) !== false;
     }
 
     /**
+     * Reemplaza los vínculos del profesional con sedes/servicios. Sólo enlaza
+     * destinos de la misma cuenta (no se cruzan tenants).
+     *
      * @param list<int> $ids
      */
-    private function replaceLinks(Connection $tx, string $table, string $col, int $staffId, array $ids): void
+    private function replaceLinks(Connection $tx, string $table, string $col, int $staffId, int $accountId, array $ids): void
     {
+        // 'location_id' -> 'location', 'service_id' -> 'service' (ambas tienen account_id).
+        $targetTable = substr($col, 0, -3);
         $tx->executeStatement("DELETE FROM $table WHERE staff_id = ?", [$staffId]);
         foreach (array_unique($ids) as $value) {
+            if ($tx->fetchOne("SELECT 1 FROM $targetTable WHERE id = ? AND account_id = ?", [$value, $accountId]) === false) {
+                continue;
+            }
             $tx->executeStatement("INSERT INTO $table (staff_id, $col) VALUES (?, ?)", [$staffId, $value]);
         }
     }

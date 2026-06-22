@@ -67,7 +67,7 @@ final class RecurringService
         ): int {
             $customerId = (int) $tx->fetchOne(
                 'INSERT INTO customer (name, phone) VALUES (?, ?)
-                 ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name RETURNING id',
+                 ON CONFLICT (account_id, phone) DO UPDATE SET name = EXCLUDED.name RETURNING id',
                 [$name, $phone]
             );
 

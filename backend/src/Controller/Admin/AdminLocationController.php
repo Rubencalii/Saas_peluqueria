@@ -36,7 +36,8 @@ final class AdminLocationController extends AdminController
         }
 
         $rows = $this->db->fetchAllAssociative(
-            'SELECT id, name, slug, address, phone, timezone, active FROM location ORDER BY name'
+            'SELECT id, name, slug, address, phone, timezone, active FROM location WHERE account_id = ? ORDER BY name',
+            [self::user($request)['account_id']]
         );
 
         return $this->json(['locations' => array_map(static fn (array $r): array => [
@@ -68,15 +69,16 @@ final class AdminLocationController extends AdminController
         if ($name === '' || $slug === '') {
             return $this->error('VALIDATION', 'name y slug son obligatorios.', 400);
         }
-        if ($this->db->fetchOne('SELECT 1 FROM location WHERE slug = ?', [$slug]) !== false) {
+        $accountId = self::user($request)['account_id'];
+        if ($this->db->fetchOne('SELECT 1 FROM location WHERE slug = ? AND account_id = ?', [$slug, $accountId]) !== false) {
             return $this->error('CONFLICT', 'Ya existe una sede con ese slug.', 409);
         }
 
         $id = (int) $this->db->fetchOne(
-            'INSERT INTO location (name, slug, address, phone, timezone, active)
-             VALUES (?, ?, ?, ?, COALESCE(?, \'Europe/Madrid\'), COALESCE(?, TRUE)) RETURNING id',
+            'INSERT INTO location (account_id, name, slug, address, phone, timezone, active)
+             VALUES (?, ?, ?, ?, ?, COALESCE(?, \'Europe/Madrid\'), COALESCE(?, TRUE)) RETURNING id',
             [
-                $name, $slug,
+                $accountId, $name, $slug,
                 isset($payload['address']) && $payload['address'] !== '' ? (string) $payload['address'] : null,
                 isset($payload['phone']) && $payload['phone'] !== '' ? (string) $payload['phone'] : null,
                 isset($payload['timezone']) && $payload['timezone'] !== '' ? (string) $payload['timezone'] : null,
@@ -100,7 +102,8 @@ final class AdminLocationController extends AdminController
         if (!is_array($payload)) {
             return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
         }
-        if ($this->db->fetchOne('SELECT 1 FROM location WHERE id = ?', [$id]) === false) {
+        $accountId = self::user($request)['account_id'];
+        if ($this->db->fetchOne('SELECT 1 FROM location WHERE id = ? AND account_id = ?', [$id, $accountId]) === false) {
             return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);
         }
 
@@ -125,7 +128,8 @@ final class AdminLocationController extends AdminController
         }
 
         $params[] = $id;
-        $this->db->executeStatement('UPDATE location SET ' . implode(', ', $sets) . ' WHERE id = ?', $params);
+        $params[] = $accountId;
+        $this->db->executeStatement('UPDATE location SET ' . implode(', ', $sets) . ' WHERE id = ? AND account_id = ?', $params);
 
         return $this->json(['ok' => true]);
     }
@@ -139,6 +143,9 @@ final class AdminLocationController extends AdminController
             $this->auth->assertLocation($user, $id);
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+        if ($this->db->fetchOne('SELECT 1 FROM location WHERE id = ? AND account_id = ?', [$id, $user['account_id']]) === false) {
+            return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);
         }
 
         $row = $this->db->fetchAssociative(
@@ -168,7 +175,7 @@ final class AdminLocationController extends AdminController
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
-        if ($this->db->fetchOne('SELECT 1 FROM location WHERE id = ?', [$id]) === false) {
+        if ($this->db->fetchOne('SELECT 1 FROM location WHERE id = ? AND account_id = ?', [$id, $user['account_id']]) === false) {
             return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);
         }
 

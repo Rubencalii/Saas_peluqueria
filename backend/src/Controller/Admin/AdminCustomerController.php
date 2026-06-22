@@ -36,15 +36,16 @@ final class AdminCustomerController extends AdminController
     {
         $query = trim((string) $request->query->get('query', ''));
         $pg = self::pagination($request);
+        $accountId = self::user($request)['account_id'];
 
         if ($query !== '') {
-            $where = 'WHERE name ILIKE ? OR phone ILIKE ?';
+            $where = 'WHERE account_id = ? AND (name ILIKE ? OR phone ILIKE ?)';
             $order = 'ORDER BY name';
-            $params = ['%' . $query . '%', '%' . $query . '%'];
+            $params = [$accountId, '%' . $query . '%', '%' . $query . '%'];
         } else {
-            $where = '';
+            $where = 'WHERE account_id = ?';
             $order = 'ORDER BY created_at DESC';
-            $params = [];
+            $params = [$accountId];
         }
 
         $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM customer $where", $params);
@@ -62,11 +63,11 @@ final class AdminCustomerController extends AdminController
     }
 
     #[Route('/api/v1/admin/customers/{id}', name: 'admin_customer_detail', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function detail(int $id): JsonResponse
+    public function detail(int $id, Request $request): JsonResponse
     {
         $row = $this->db->fetchAssociative(
-            'SELECT id, name, phone, email, wa_consent, consent_at, created_at FROM customer WHERE id = ?',
-            [$id]
+            'SELECT id, name, phone, email, wa_consent, consent_at, created_at FROM customer WHERE id = ? AND account_id = ?',
+            [$id, self::user($request)['account_id']]
         );
         if ($row === false) {
             return $this->error('NOT_FOUND', 'Cliente no encontrado.', 404);
@@ -110,7 +111,8 @@ final class AdminCustomerController extends AdminController
             return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
         }
 
-        $exists = $this->db->fetchOne('SELECT 1 FROM customer WHERE id = ?', [$id]);
+        $accountId = self::user($request)['account_id'];
+        $exists = $this->db->fetchOne('SELECT 1 FROM customer WHERE id = ? AND account_id = ?', [$id, $accountId]);
         if ($exists === false) {
             return $this->error('NOT_FOUND', 'Cliente no encontrado.', 404);
         }
@@ -136,9 +138,10 @@ final class AdminCustomerController extends AdminController
         }
 
         $params[] = $id;
-        $this->db->executeStatement('UPDATE customer SET ' . implode(', ', $sets) . ' WHERE id = ?', $params);
+        $params[] = $accountId;
+        $this->db->executeStatement('UPDATE customer SET ' . implode(', ', $sets) . ' WHERE id = ? AND account_id = ?', $params);
 
-        return $this->detail($id);
+        return $this->detail($id, $request);
     }
 
     /**
@@ -151,6 +154,9 @@ final class AdminCustomerController extends AdminController
             $this->auth->assertRole(self::user($request), self::GDPR_ROLES);
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+        if (!$this->customerInAccount($id, self::user($request)['account_id'])) {
+            return $this->error('NOT_FOUND', 'Cliente no encontrado.', 404);
         }
 
         $data = $this->gdpr->export($id);
@@ -173,12 +179,20 @@ final class AdminCustomerController extends AdminController
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
+        if (!$this->customerInAccount($id, self::user($request)['account_id'])) {
+            return $this->error('NOT_FOUND', 'Cliente no encontrado.', 404);
+        }
 
         if (!$this->gdpr->anonymize($id)) {
             return $this->error('NOT_FOUND', 'Cliente no encontrado.', 404);
         }
 
         return $this->json(['ok' => true, 'anonymized' => true]);
+    }
+
+    private function customerInAccount(int $id, int $accountId): bool
+    {
+        return $this->db->fetchOne('SELECT 1 FROM customer WHERE id = ? AND account_id = ?', [$id, $accountId]) !== false;
     }
 
     /**

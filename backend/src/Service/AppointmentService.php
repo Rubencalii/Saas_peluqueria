@@ -177,7 +177,7 @@ final class AppointmentService
         return (int) $tx->fetchOne(
             'INSERT INTO customer (name, phone, email, wa_consent, consent_at)
              VALUES (?, ?, ?, ?, CASE WHEN ? THEN now() END)
-             ON CONFLICT (phone) DO UPDATE SET
+             ON CONFLICT (account_id, phone) DO UPDATE SET
                  name       = EXCLUDED.name,
                  email      = COALESCE(EXCLUDED.email, customer.email),
                  wa_consent = EXCLUDED.wa_consent,

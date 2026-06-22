@@ -35,15 +35,24 @@ final class AdminServiceController extends AdminController
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
+        $accountId = self::user($request)['account_id'];
 
         $services = $this->db->fetchAllAssociative(
-            'SELECT id, name, duration_min, buffer_min, price, description, active, deposit_amount FROM service ORDER BY name'
+            'SELECT id, name, duration_min, buffer_min, price, description, active, deposit_amount
+               FROM service WHERE account_id = ? ORDER BY name',
+            [$accountId]
         );
+        // Segmentos y ofertas se acotan a los servicios de la cuenta vía subconsulta.
         $segments = $this->db->fetchAllAssociative(
-            'SELECT service_id, position, minutes, busy FROM service_segment ORDER BY service_id, position'
+            'SELECT service_id, position, minutes, busy FROM service_segment
+              WHERE service_id IN (SELECT id FROM service WHERE account_id = ?)
+              ORDER BY service_id, position',
+            [$accountId]
         );
         $offers = $this->db->fetchAllAssociative(
-            'SELECT service_id, location_id, price_override FROM service_location'
+            'SELECT service_id, location_id, price_override FROM service_location
+              WHERE service_id IN (SELECT id FROM service WHERE account_id = ?)',
+            [$accountId]
         );
 
         $byService = [];
@@ -103,13 +112,14 @@ final class AdminServiceController extends AdminController
         if ($segError !== null) {
             return $this->error('VALIDATION', $segError, 400);
         }
+        $accountId = self::user($request)['account_id'];
 
-        $id = $this->db->transactional(function (Connection $tx) use ($payload, $name, $duration): int {
+        $id = $this->db->transactional(function (Connection $tx) use ($payload, $name, $duration, $accountId): int {
             $sid = (int) $tx->fetchOne(
-                'INSERT INTO service (name, duration_min, buffer_min, price, deposit_amount, description, active)
-                 VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, TRUE)) RETURNING id',
+                'INSERT INTO service (account_id, name, duration_min, buffer_min, price, deposit_amount, description, active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, TRUE)) RETURNING id',
                 [
-                    $name, $duration, (int) ($payload['buffer_min'] ?? 0),
+                    $accountId, $name, $duration, (int) ($payload['buffer_min'] ?? 0),
                     $this->numOrNull($payload['price'] ?? null),
                     $this->numOrNull($payload['deposit_amount'] ?? null),
                     isset($payload['description']) ? (string) $payload['description'] : null,
@@ -117,7 +127,7 @@ final class AdminServiceController extends AdminController
                 ]
             );
             $this->replaceSegments($tx, $sid, $payload['segments'] ?? null);
-            $this->replaceLocations($tx, $sid, $payload['locations'] ?? null);
+            $this->replaceLocations($tx, $sid, $accountId, $payload['locations'] ?? null);
 
             return $sid;
         });
@@ -139,7 +149,11 @@ final class AdminServiceController extends AdminController
             return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
         }
 
-        $current = $this->db->fetchAssociative('SELECT duration_min FROM service WHERE id = ?', [$id]);
+        $accountId = self::user($request)['account_id'];
+        $current = $this->db->fetchAssociative(
+            'SELECT duration_min FROM service WHERE id = ? AND account_id = ?',
+            [$id, $accountId]
+        );
         if ($current === false) {
             return $this->error('NOT_FOUND', 'Servicio no encontrado.', 404);
         }
@@ -175,16 +189,17 @@ final class AdminServiceController extends AdminController
             }
         }
 
-        $this->db->transactional(function (Connection $tx) use ($id, $sets, $params, $payload): void {
+        $this->db->transactional(function (Connection $tx) use ($id, $sets, $params, $payload, $accountId): void {
             if ($sets !== []) {
                 $params[] = $id;
-                $tx->executeStatement('UPDATE service SET ' . implode(', ', $sets) . ' WHERE id = ?', $params);
+                $params[] = $accountId;
+                $tx->executeStatement('UPDATE service SET ' . implode(', ', $sets) . ' WHERE id = ? AND account_id = ?', $params);
             }
             if (array_key_exists('segments', $payload)) {
                 $this->replaceSegments($tx, $id, $payload['segments']);
             }
             if (array_key_exists('locations', $payload)) {
-                $this->replaceLocations($tx, $id, $payload['locations']);
+                $this->replaceLocations($tx, $id, $accountId, $payload['locations']);
             }
         });
 
@@ -238,16 +253,21 @@ final class AdminServiceController extends AdminController
     /**
      * @param mixed $locations  lista de {location_id, price_override?}
      */
-    private function replaceLocations(Connection $tx, int $serviceId, $locations): void
+    private function replaceLocations(Connection $tx, int $serviceId, int $accountId, $locations): void
     {
         if ($locations === null) {
             return;
         }
         $tx->executeStatement('DELETE FROM service_location WHERE service_id = ?', [$serviceId]);
         foreach ((array) $locations as $loc) {
+            $locationId = (int) $loc['location_id'];
+            // La sede debe ser de la misma cuenta; si no, se ignora (no se filtra entre tenants).
+            if ($tx->fetchOne('SELECT 1 FROM location WHERE id = ? AND account_id = ?', [$locationId, $accountId]) === false) {
+                continue;
+            }
             $tx->executeStatement(
                 'INSERT INTO service_location (service_id, location_id, price_override) VALUES (?, ?, ?)',
-                [$serviceId, (int) $loc['location_id'], $this->numOrNull($loc['price_override'] ?? null)]
+                [$serviceId, $locationId, $this->numOrNull($loc['price_override'] ?? null)]
             );
         }
     }

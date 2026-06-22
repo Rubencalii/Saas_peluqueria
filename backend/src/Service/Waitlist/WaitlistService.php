@@ -172,7 +172,7 @@ final class WaitlistService
         return (int) $tx->fetchOne(
             'INSERT INTO customer (name, phone, wa_consent, consent_at)
              VALUES (?, ?, ?, CASE WHEN ? THEN now() END)
-             ON CONFLICT (phone) DO UPDATE SET
+             ON CONFLICT (account_id, phone) DO UPDATE SET
                  name       = EXCLUDED.name,
                  wa_consent = customer.wa_consent OR EXCLUDED.wa_consent,
                  consent_at = CASE
