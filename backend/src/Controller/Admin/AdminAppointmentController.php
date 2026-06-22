@@ -32,6 +32,7 @@ final class AdminAppointmentController extends AdminController
         private readonly AppointmentService $appointments,
         private readonly AuthService $auth,
         private readonly NotificationService $notifications,
+        private readonly \App\Service\Loyalty\LoyaltyService $loyalty,
     ) {
     }
 
@@ -109,6 +110,11 @@ final class AdminAppointmentController extends AdminController
             'UPDATE appointment SET ' . implode(', ', $sets) . ' WHERE id = ?',
             $params
         );
+
+        // Al completar la cita, abona los puntos de fidelización (idempotente).
+        if (($payload['status'] ?? null) === 'completada') {
+            $this->loyalty->awardForCompletedAppointment($id);
+        }
 
         return $this->json($this->detail($id));
     }

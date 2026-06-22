@@ -27,6 +27,7 @@ final class AdminCustomerController extends AdminController
         private readonly Connection $db,
         private readonly AuthService $auth,
         private readonly GdprService $gdpr,
+        private readonly \App\Service\Loyalty\LoyaltyService $loyalty,
     ) {
     }
 
@@ -96,6 +97,7 @@ final class AdminCustomerController extends AdminController
             'location_name' => (string) $a['location_name'],
             'staff_name' => $a['staff_name'] !== null ? (string) $a['staff_name'] : null,
         ], $appts);
+        $customer['loyalty'] = $this->loyalty->summary($id);
 
         return $this->json(['customer' => $customer]);
     }

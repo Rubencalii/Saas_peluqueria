@@ -24,7 +24,8 @@
 | Seguridad: firma webhook WhatsApp, rate limit login, reset de contraseña | ✅ |
 | Operación: CORS, health check, OpenAPI, CI (GitHub Actions) | ✅ |
 | RGPD (doc 09): export, anonimización, baja de consentimiento | ✅ |
-| Suite de tests (PHPUnit) | ✅ 50 tests |
+| Fidelización por puntos (1 pt/€ al completar cita) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 53 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -66,6 +67,7 @@ php bin/phpunit
 | `0009_password_reset.sql` | Token de reset de contraseña del panel |
 | `0010_audit_log.sql` | Registro de actividad del panel (auditoría) |
 | `0011_reviews.sql` | Valoraciones post-cita |
+| `0012_loyalty.sql` | Fidelización por puntos |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -157,7 +159,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**50 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
+**53 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
 
 ```bash
 cd backend && php bin/phpunit
@@ -191,7 +193,8 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 ### ⚪ Producto (prioridad baja)
 - ✅ *Resuelto (2026-06-21):* **audit log** de acciones del panel (listener en `kernel.terminate` → tabla `audit_log`; consulta en `GET /admin/audit`).
 - ✅ *Resuelto (2026-06-21):* **valoración post-cita** (envío público por código + lista y agregados en el panel).
-- Pendiente: fidelización/puntos, citas recurrentes, i18n de mensajes.
+- ✅ *Resuelto (2026-06-21):* **fidelización por puntos** (abono al completar cita; saldo e historial en la ficha del cliente).
+- Pendiente: citas recurrentes, i18n de mensajes.
 
 ### Frontend (fuera de backend)
 - **Panel de administración** y **web pública de reserva** (consumen esta API).
