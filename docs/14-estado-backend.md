@@ -82,7 +82,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ### 5.2 Panel (requieren `Authorization: Bearer <JWT>` + rol)
 
-**Auth:** `POST /api/v1/auth/login` · `GET /api/v1/admin/me`
+**Auth:** `POST /api/v1/auth/login` · `GET /api/v1/admin/me` · reset de contraseña `POST /api/v1/auth/password/forgot` · `POST /api/v1/auth/password/reset`
 
 | Área | Endpoints |
 |------|-----------|
@@ -122,6 +122,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 |----------|-----|
 | `DATABASE_URL` | Conexión PostgreSQL |
 | `APP_SECRET` | Secreto de la app **y** firma de los JWT del panel |
+| `APP_URL` | URL pública del sitio (enlaces, p. ej. el de reset de contraseña) |
 | `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | Cloud API de WhatsApp (vacío → salida al log) |
 | `WHATSAPP_APP_SECRET` | Verifica la firma del webhook de Meta (vacío → no se exige firma) |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | IA del bot (vacío → solo botones) |
@@ -137,7 +138,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**34 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera y feed iCal.
+**38 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal y reset de contraseña.
 
 ```bash
 cd backend && php bin/phpunit
@@ -151,7 +152,9 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 - ✅ *Resuelto (2026-06-21):* **firma del webhook de WhatsApp** (`X-Hub-Signature-256`) verificada con HMAC del app secret (degrada sin `WHATSAPP_APP_SECRET`).
 - ✅ *Resuelto (2026-06-21):* **rate limiting en el login** (`/auth/login`, 10/min por IP) contra fuerza bruta.
 - ✅ *Resuelto (2026-06-21):* se retiró el `APP_SECRET` de alta entropía de los `.env` versionados (alerta de GitGuardian) y se **purgó del historial de git** (reescritura + force-push). Los secretos reales van en `.env.local`.
-- ⏳ **Reset de contraseña** del panel y, opcional, **revocación/refresh** del JWT.
+- ✅ *Resuelto (2026-06-21):* **reset de contraseña** del panel (token de un solo uso con caducidad, respuesta genérica anti-enumeración; enlace al log sin transporte de email). Opcional pendiente: **revocación/refresh** del JWT.
+
+> Con esto el bloque 🔴 de seguridad queda cubierto (salvo el refresh/revocación de JWT, opcional).
 
 ### 🟠 Cumplimiento (RGPD, doc 09)
 - **Export y borrado/anonimización** de datos de un cliente.

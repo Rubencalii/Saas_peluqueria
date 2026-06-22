@@ -20,6 +20,7 @@ services:
             $phoneNumberId: '%env(WHATSAPP_PHONE_NUMBER_ID)%'
             $graphVersion: '%env(WHATSAPP_GRAPH_VERSION)%'
             $secret: '%env(APP_SECRET)%'
+            $appUrl: '%env(APP_URL)%'
             $apiKey: '%env(ANTHROPIC_API_KEY)%'
             $model: '%env(ANTHROPIC_MODEL)%'
             $secretKey: '%env(STRIPE_SECRET_KEY)%'

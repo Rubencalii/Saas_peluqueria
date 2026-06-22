@@ -22,7 +22,8 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 #[AsEventListener(event: KernelEvents::REQUEST, priority: 12)]
 final class PublicRateLimitListener
 {
-    private const LOGIN_PATH = '/api/v1/auth/login';
+    /** Prefijo de las rutas de auth (login, forgot, reset) — limitador estricto. */
+    private const AUTH_PREFIX = '/api/v1/auth/';
 
     /** @var list<array{method: string, path: string}> */
     private const PROTECTED = [
@@ -49,9 +50,9 @@ final class PublicRateLimitListener
         $path = $request->getPathInfo();
         $ip = $request->getClientIp() ?? 'anon';
 
-        // El login usa su propio limitador estricto.
-        if ($method === 'POST' && $path === self::LOGIN_PATH) {
-            $this->enforce($event, $this->authLimiter->create('login:' . $ip));
+        // Las rutas de auth (login, forgot, reset) usan el limitador estricto.
+        if ($method === 'POST' && str_starts_with($path, self::AUTH_PREFIX)) {
+            $this->enforce($event, $this->authLimiter->create('auth:' . $ip));
 
             return;
         }
