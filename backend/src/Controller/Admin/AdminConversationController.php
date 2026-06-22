@@ -45,29 +45,37 @@ final class AdminConversationController extends AdminController
             $params[] = $user['location_id'];
         }
 
+        $whereSql = $where !== [] ? ' WHERE ' . implode(' AND ', $where) : '';
+        $pg = self::pagination($request);
+
+        $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM conversation c$whereSql", $params);
+
         $sql = 'SELECT c.wa_id, c.state, c.needs_human, c.location_id, c.updated_at,
                        l.name AS location_name, cu.name AS customer_name
                   FROM conversation c
                   LEFT JOIN location l  ON l.id = c.location_id
-                  LEFT JOIN customer cu ON cu.phone = (\'+\' || c.wa_id)';
-        if ($where !== []) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-        }
-        $sql .= ' ORDER BY c.updated_at DESC LIMIT 100';
+                  LEFT JOIN customer cu ON cu.phone = (\'+\' || c.wa_id)'
+            . $whereSql
+            . ' ORDER BY c.updated_at DESC LIMIT ? OFFSET ?';
 
-        $rows = $this->db->fetchAllAssociative($sql, $params);
+        $rows = $this->db->fetchAllAssociative($sql, [...$params, $pg['per_page'], $pg['offset']]);
 
-        return $this->json(['conversations' => array_map(static fn (array $r): array => [
-            'wa_id' => (string) $r['wa_id'],
-            'phone' => '+' . $r['wa_id'],
-            'customer_name' => $r['customer_name'] !== null ? (string) $r['customer_name'] : null,
-            'state' => (string) $r['state'],
-            'needs_human' => (bool) $r['needs_human'],
-            'location' => $r['location_id'] !== null
-                ? ['id' => (int) $r['location_id'], 'name' => (string) $r['location_name']]
-                : null,
-            'updated_at' => (new \DateTimeImmutable($r['updated_at']))->format('c'),
-        ], $rows)]);
+        return $this->json([
+            'conversations' => array_map(static fn (array $r): array => [
+                'wa_id' => (string) $r['wa_id'],
+                'phone' => '+' . $r['wa_id'],
+                'customer_name' => $r['customer_name'] !== null ? (string) $r['customer_name'] : null,
+                'state' => (string) $r['state'],
+                'needs_human' => (bool) $r['needs_human'],
+                'location' => $r['location_id'] !== null
+                    ? ['id' => (int) $r['location_id'], 'name' => (string) $r['location_name']]
+                    : null,
+                'updated_at' => (new \DateTimeImmutable($r['updated_at']))->format('c'),
+            ], $rows),
+            'page' => $pg['page'],
+            'per_page' => $pg['per_page'],
+            'total' => $total,
+        ]);
     }
 
     #[Route('/api/v1/admin/conversations/{waId}/reply', name: 'admin_conversation_reply', methods: ['POST'], requirements: ['waId' => '\d+'])]

@@ -34,24 +34,30 @@ final class AdminCustomerController extends AdminController
     public function list(Request $request): JsonResponse
     {
         $query = trim((string) $request->query->get('query', ''));
+        $pg = self::pagination($request);
 
         if ($query !== '') {
-            $like = '%' . $query . '%';
-            $rows = $this->db->fetchAllAssociative(
-                'SELECT id, name, phone, email, wa_consent, created_at
-                   FROM customer
-                  WHERE name ILIKE ? OR phone ILIKE ?
-                  ORDER BY name LIMIT 50',
-                [$like, $like]
-            );
+            $where = 'WHERE name ILIKE ? OR phone ILIKE ?';
+            $order = 'ORDER BY name';
+            $params = ['%' . $query . '%', '%' . $query . '%'];
         } else {
-            $rows = $this->db->fetchAllAssociative(
-                'SELECT id, name, phone, email, wa_consent, created_at
-                   FROM customer ORDER BY created_at DESC LIMIT 50'
-            );
+            $where = '';
+            $order = 'ORDER BY created_at DESC';
+            $params = [];
         }
 
-        return $this->json(['customers' => array_map($this->present(...), $rows)]);
+        $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM customer $where", $params);
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT id, name, phone, email, wa_consent, created_at FROM customer $where $order LIMIT ? OFFSET ?",
+            [...$params, $pg['per_page'], $pg['offset']]
+        );
+
+        return $this->json([
+            'customers' => array_map($this->present(...), $rows),
+            'page' => $pg['page'],
+            'per_page' => $pg['per_page'],
+            'total' => $total,
+        ]);
     }
 
     #[Route('/api/v1/admin/customers/{id}', name: 'admin_customer_detail', methods: ['GET'], requirements: ['id' => '\d+'])]

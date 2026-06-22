@@ -109,6 +109,8 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 **Roles:** `recepcion`, `profesional`, `admin_sede`, `admin_cadena` (autorización por sede; el catálogo y las sedes los gobierna `admin_cadena`).
 
+> **Paginación**: los listados que crecen (clientes, conversaciones, lista de espera) aceptan `page` (desde 1) y `per_page` (1–100, por defecto 20) y devuelven `{ ..., page, per_page, total }`.
+
 ### 5.3 Webhooks
 
 | Método | Ruta | Descripción |

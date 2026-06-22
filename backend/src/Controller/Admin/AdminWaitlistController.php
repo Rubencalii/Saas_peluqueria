@@ -42,7 +42,14 @@ final class AdminWaitlistController extends AdminController
             $status = 'esperando';
         }
 
-        return $this->json(['waitlist' => $this->waitlist->listForLocation($locationId, $status)]);
+        $pg = self::pagination($request);
+
+        return $this->json([
+            'waitlist' => $this->waitlist->listForLocation($locationId, $status, $pg['per_page'], $pg['offset']),
+            'page' => $pg['page'],
+            'per_page' => $pg['per_page'],
+            'total' => $this->waitlist->countForLocation($locationId, $status),
+        ]);
     }
 
     #[Route('/api/v1/admin/waitlist/{id}', name: 'admin_waitlist_cancel', methods: ['DELETE'], requirements: ['id' => '\d+'])]

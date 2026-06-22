@@ -252,10 +252,13 @@ paths:
   /api/v1/admin/customers:
     get:
       tags: [Panel]
-      summary: Buscar clientes
+      summary: Buscar clientes (paginado)
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: query, in: query, schema: { type: string } }]
-      responses: { "200": { description: Clientes } }
+      parameters:
+        - { name: query, in: query, schema: { type: string } }
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/PerPage" }
+      responses: { "200": { description: "Clientes + { page, per_page, total }" } }
 
   /api/v1/admin/customers/{id}:
     get:
@@ -411,10 +414,13 @@ paths:
   /api/v1/admin/conversations:
     get:
       tags: [Panel]
-      summary: Bandeja de atención humana de WhatsApp
+      summary: Bandeja de atención humana de WhatsApp (paginado)
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: status, in: query, schema: { type: string, enum: [pendiente, all] } }]
-      responses: { "200": { description: Conversaciones } }
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pendiente, all] } }
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/PerPage" }
+      responses: { "200": { description: "Conversaciones + { page, per_page, total }" } }
 
   /api/v1/admin/conversations/{waId}/reply:
     post:
@@ -428,12 +434,14 @@ paths:
   /api/v1/admin/waitlist:
     get:
       tags: [Panel]
-      summary: Lista de espera
+      summary: Lista de espera (paginado)
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: location_id, in: query, schema: { type: integer } }
         - { name: status, in: query, schema: { type: string, enum: [esperando, avisado, convertido, cancelado] } }
-      responses: { "200": { description: Entradas } }
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/PerPage" }
+      responses: { "200": { description: "Entradas + { page, per_page, total }" } }
 
   /api/v1/admin/waitlist/{id}:
     delete:
@@ -485,6 +493,18 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+      description: Página (desde 1)
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      description: Resultados por página (máx. 100)
 
   responses:
     Error:

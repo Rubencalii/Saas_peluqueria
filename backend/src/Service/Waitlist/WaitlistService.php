@@ -95,12 +95,25 @@ final class WaitlistService
         });
     }
 
+    /** Total de entradas que casan el filtro (para paginar). */
+    public function countForLocation(?int $locationId, string $status): int
+    {
+        $where = 'status = ?';
+        $params = [$status];
+        if ($locationId !== null) {
+            $where .= ' AND location_id = ?';
+            $params[] = $locationId;
+        }
+
+        return (int) $this->db->fetchOne("SELECT COUNT(*) FROM waitlist WHERE $where", $params);
+    }
+
     /**
-     * Entradas de la lista para el panel.
+     * Entradas de la lista para el panel (paginadas).
      *
      * @return list<array<string, mixed>>
      */
-    public function listForLocation(?int $locationId, string $status): array
+    public function listForLocation(?int $locationId, string $status, int $limit = 50, int $offset = 0): array
     {
         $where = 'w.status = ?';
         $params = [$status];
@@ -121,8 +134,8 @@ final class WaitlistService
                LEFT JOIN staff st ON st.id = w.staff_id
                JOIN customer c ON c.id = w.customer_id
               WHERE $where
-              ORDER BY w.created_at LIMIT 200",
-            $params
+              ORDER BY w.created_at LIMIT ? OFFSET ?",
+            [...$params, $limit, $offset]
         );
 
         return array_map(static fn (array $r): array => [
