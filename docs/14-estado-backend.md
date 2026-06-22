@@ -1,10 +1,12 @@
 # 14 · Estado del Backend
 
-> Actualización a **2026-06-21**. Inventario de lo implementado en `backend/`
+> Actualización a **2026-06-22**. Inventario de lo implementado en `backend/`
 > (Symfony 7 + PHP 8.5, Doctrine DBAL sobre PostgreSQL) y backlog técnico
 > pendiente. El backend está **completo**: núcleo + backlog del doc 13 +
-> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 56 tests).
-> Lo que queda del proyecto es el **frontend**.
+> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 57 tests).
+> En curso, el **multi-tenant** (doc 15): Fases 1-2 hechas (cimientos + aislamiento
+> del panel por cuenta). Lo que queda del proyecto es el **frontend** y las fases
+> de multi-tenant público/RLS/billing.
 
 ## 1. Resumen
 
@@ -27,7 +29,8 @@
 | Fidelización por puntos (1 pt/€ al completar cita) | ✅ |
 | Citas recurrentes (cron genera la próxima) | ✅ |
 | Multi-tenant Fase 1 (cimientos: cuenta/plan/suscripción, JWT con account_id) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 56 tests |
+| Multi-tenant Fase 2 (aislamiento del panel: unicidad por-cuenta + scoping de todas las consultas del panel) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 57 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -72,6 +75,7 @@ php bin/phpunit
 | `0012_loyalty.sql` | Fidelización por puntos |
 | `0013_recurring.sql` | Citas recurrentes |
 | `0014_multitenant_foundations.sql` | Multi-tenant Fase 1: `account`/`plan`/`subscription` + `account_id` |
+| `0015_per_tenant_uniqueness.sql` | Multi-tenant Fase 2: unicidad por-cuenta (`location.slug`, `customer.phone`) |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -165,7 +169,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**56 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
+**57 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD), y un test **funcional HTTP** de aislamiento multi-tenant (un segundo salón no ve ni toca los datos del primero).
 
 ```bash
 cd backend && php bin/phpunit

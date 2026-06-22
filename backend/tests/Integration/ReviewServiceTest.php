@@ -50,7 +50,7 @@ final class ReviewServiceTest extends DatabaseTestCase
 
         self::assertGreaterThan(0, $res['review_id']);
 
-        $agg = $this->reviews->aggregates(1);
+        $agg = $this->reviews->aggregates(1, 1);
         self::assertSame(1, $agg['count']);
         self::assertSame(5.0, $agg['average']);
     }

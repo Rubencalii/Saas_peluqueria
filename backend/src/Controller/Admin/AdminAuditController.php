@@ -32,11 +32,16 @@ final class AdminAuditController extends AdminController
         }
 
         $pg = self::pagination($request);
-        $total = (int) $this->db->fetchOne('SELECT COUNT(*) FROM audit_log');
+        // Multi-tenant: el registro no lleva account_id, así que se acota a las
+        // acciones de los usuarios de la cuenta (las anónimas/sistema quedan fuera
+        // del panel; atribuirlas requeriría account_id en audit_log — Fase futura).
+        $accountId = self::user($request)['account_id'];
+        $scope = 'user_id IN (SELECT id FROM app_user WHERE account_id = ?)';
+        $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE $scope", [$accountId]);
         $rows = $this->db->fetchAllAssociative(
-            'SELECT id, user_id, user_email, method, path, status_code, created_at
-               FROM audit_log ORDER BY created_at DESC LIMIT ? OFFSET ?',
-            [$pg['per_page'], $pg['offset']]
+            "SELECT id, user_id, user_email, method, path, status_code, created_at
+               FROM audit_log WHERE $scope ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            [$accountId, $pg['per_page'], $pg['offset']]
         );
 
         return $this->json([

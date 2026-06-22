@@ -47,8 +47,8 @@ final class AdminAgendaController extends AdminController
         }
 
         $location = $this->db->fetchAssociative(
-            'SELECT id, name, slug, timezone FROM location WHERE id = ?',
-            [$locationId]
+            'SELECT id, name, slug, timezone FROM location WHERE id = ? AND account_id = ?',
+            [$locationId, $user['account_id']]
         );
         if ($location === false) {
             return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);

@@ -96,10 +96,10 @@ final class WaitlistService
     }
 
     /** Total de entradas que casan el filtro (para paginar). */
-    public function countForLocation(?int $locationId, string $status): int
+    public function countForLocation(?int $locationId, int $accountId, string $status): int
     {
-        $where = 'status = ?';
-        $params = [$status];
+        $where = 'status = ? AND location_id IN (SELECT id FROM location WHERE account_id = ?)';
+        $params = [$status, $accountId];
         if ($locationId !== null) {
             $where .= ' AND location_id = ?';
             $params[] = $locationId;
@@ -113,10 +113,10 @@ final class WaitlistService
      *
      * @return list<array<string, mixed>>
      */
-    public function listForLocation(?int $locationId, string $status, int $limit = 50, int $offset = 0): array
+    public function listForLocation(?int $locationId, int $accountId, string $status, int $limit = 50, int $offset = 0): array
     {
-        $where = 'w.status = ?';
-        $params = [$status];
+        $where = 'w.status = ? AND w.location_id IN (SELECT id FROM location WHERE account_id = ?)';
+        $params = [$status, $accountId];
         if ($locationId !== null) {
             $where .= ' AND w.location_id = ?';
             $params[] = $locationId;

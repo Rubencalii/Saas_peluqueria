@@ -37,7 +37,7 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Informes: `GET /api/v1/admin/reports/{occupancy,no-shows,bookings-by-channel}`
   - Probado de extremo a extremo vía curl
 - ✅ Motor de notificaciones y recordatorios (doc 07): al crear/cambiar/cancelar una cita se programan automáticamente confirmación, recordatorio (24 h antes) y avisos de cambio/cancelación en la tabla `notification`. El comando `php bin/console app:notifications:dispatch` (para cron) entrega las vencidas por WhatsApp y marca `enviada`/`fallida`. Probado de extremo a extremo (con/sin consentimiento, cancelación, recordatorio futuro)
-- ✅ Suite de tests automatizados (PHPUnit, doc 10): **56 tests** sobre la lógica crítica — disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, JWT/roles, redacción de notificaciones, lista de espera, feed iCal, reset de contraseña, RGPD y degradación de pagos. Integración contra BD de test aislada con rollback por transacción
+- ✅ Suite de tests automatizados (PHPUnit, doc 10): **57 tests** sobre la lógica crítica — disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, JWT/roles, redacción de notificaciones, lista de espera, feed iCal, reset de contraseña, RGPD, degradación de pagos y **aislamiento multi-tenant** (test funcional HTTP). Integración contra BD de test aislada con rollback por transacción
 - ✅ Endurecimiento de la API (doc 06 §6): rate limiting por IP en endpoints públicos (60/min) y en el login (10/min), errores uniformes en JSON bajo `/api`, y runner de migraciones versionadas `php bin/console app:db:migrate`
 - ✅ Seguridad: firma del webhook de WhatsApp (`X-Hub-Signature-256`), reset de contraseña del panel (token de un solo uso), secretos fuera del repo
 - ✅ Operación / pre-frontend: **CORS** (`/api/*`), **health check** (`/api/v1/health`), **contrato OpenAPI** ([`docs/openapi.yaml`](docs/openapi.yaml)) y **CI** (GitHub Actions con Postgres + tests)
@@ -54,12 +54,18 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Depósito / pago online (§2.5): depósito por servicio (`deposit_amount`) cobrado con Stripe (PaymentIntent). `POST /api/v1/appointments/{id}/deposit` devuelve el `client_secret`; `POST /api/v1/webhooks/stripe` confirma el cobro. Desacoplado de la reserva y desactivado sin `STRIPE_SECRET_KEY`
 - ✅ Runner de migraciones estrenado: `app:db:migrate --baseline` + migraciones `0006`–`0009` (waitlist, token de calendario, pagos, reset de contraseña) aplicadas a las BD dev y test
 
+- 🟡 Multi-tenant / SaaS multi-salón (doc 15), en curso:
+  - **Fase 1** ✅ cimientos: tablas `account`/`plan`/`subscription`, cuenta `principal` con los datos actuales, `account_id` en las tablas raíz y en el JWT, `GET /api/v1/admin/account`
+  - **Fase 2** ✅ aislamiento del panel: unicidad por-cuenta (`location.slug`, `customer.phone`) y scoping por `account_id` de **todas** las consultas del panel, con test funcional de aislamiento
+  - ⏳ Pendiente: público multi-tenant (subdominio + bot por `phone_number_id`), RLS, billing (Stripe Subscriptions) y onboarding
+
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
+- ⏳ Multi-tenant Fases 3-6 (público/RLS/billing/onboarding, doc 15)
 
-> El **backend está funcionalmente completo** (núcleo + todo el backlog del doc 13). Lo que queda es **frontend**.
+> El **backend mono-cadena está funcionalmente completo** (núcleo + todo el backlog del doc 13) y el **multi-tenant** avanza por fases (1-2 hechas). Lo que queda es **frontend** y las fases de multi-tenant público/billing.
 
 ## Arranque rápido (base de datos)
 

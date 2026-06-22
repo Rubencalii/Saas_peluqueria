@@ -44,11 +44,13 @@ final class AdminWaitlistController extends AdminController
 
         $pg = self::pagination($request);
 
+        $accountId = $user['account_id'];
+
         return $this->json([
-            'waitlist' => $this->waitlist->listForLocation($locationId, $status, $pg['per_page'], $pg['offset']),
+            'waitlist' => $this->waitlist->listForLocation($locationId, $accountId, $status, $pg['per_page'], $pg['offset']),
             'page' => $pg['page'],
             'per_page' => $pg['per_page'],
-            'total' => $this->waitlist->countForLocation($locationId, $status),
+            'total' => $this->waitlist->countForLocation($locationId, $accountId, $status),
         ]);
     }
 
@@ -67,7 +69,8 @@ final class AdminWaitlistController extends AdminController
             return $this->error('NOT_FOUND', 'Entrada no encontrada.', 404);
         }
         try {
-            $this->auth->assertLocation($user, $locationId); // autoriza ANTES de cancelar
+            $this->auth->assertLocationAccount($user, $locationId); // la sede debe ser de la cuenta
+            $this->auth->assertLocation($user, $locationId);          // autoriza ANTES de cancelar
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }

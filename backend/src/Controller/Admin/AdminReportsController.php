@@ -105,8 +105,8 @@ final class AdminReportsController extends AdminController
         if ($ctx instanceof JsonResponse) {
             return $ctx;
         }
-        [$locationId, $from, $to] = $ctx;
-        [$where, $params] = $this->scope($locationId, $from, $to);
+        [$locationId, $from, $to, , $accountId] = $ctx;
+        [$where, $params] = $this->scope($locationId, $accountId, $from, $to);
 
         $totals = $this->db->fetchAssociative(
             "SELECT COUNT(*) FILTER (WHERE status = 'no_show')    AS no_shows,
@@ -137,8 +137,8 @@ final class AdminReportsController extends AdminController
         if ($ctx instanceof JsonResponse) {
             return $ctx;
         }
-        [$locationId, $from, $to] = $ctx;
-        [$where, $params] = $this->scope($locationId, $from, $to);
+        [$locationId, $from, $to, , $accountId] = $ctx;
+        [$where, $params] = $this->scope($locationId, $accountId, $from, $to);
 
         $rows = $this->db->fetchAllAssociative(
             "SELECT channel, COUNT(*) AS total FROM appointment WHERE $where GROUP BY channel",
@@ -171,8 +171,8 @@ final class AdminReportsController extends AdminController
         if ($ctx instanceof JsonResponse) {
             return $ctx;
         }
-        [$locationId, $from, $to] = $ctx;
-        [$where, $params] = $this->scope($locationId, $from, $to, 'a');
+        [$locationId, $from, $to, , $accountId] = $ctx;
+        [$where, $params] = $this->scope($locationId, $accountId, $from, $to, 'a');
         $where .= " AND a.status = 'completada'";
 
         $price = 'COALESCE(sl.price_override, s.price)';
@@ -226,8 +226,8 @@ final class AdminReportsController extends AdminController
         if ($ctx instanceof JsonResponse) {
             return $ctx;
         }
-        [$locationId, $from, $to, $tz] = $ctx;
-        [$where, $params] = $this->scope($locationId, $from, $to, 'a');
+        [$locationId, $from, $to, $tz, $accountId] = $ctx;
+        [$where, $params] = $this->scope($locationId, $accountId, $from, $to, 'a');
         $where .= " AND a.status IN ('confirmada','completada')";
 
         // weekday 0=lun..6=dom (igual que staff_schedule); hora local de la sede.
@@ -267,8 +267,8 @@ final class AdminReportsController extends AdminController
         if ($ctx instanceof JsonResponse) {
             return $ctx;
         }
-        [$locationId, $from, $to] = $ctx;
-        [$where, $params] = $this->scope($locationId, $from, $to, 'a');
+        [$locationId, $from, $to, , $accountId] = $ctx;
+        [$where, $params] = $this->scope($locationId, $accountId, $from, $to, 'a');
         $where .= " AND a.status IN ('confirmada','completada')";
 
         // Clientes con actividad en el rango y su nº total de visitas (histórico).
@@ -312,8 +312,8 @@ final class AdminReportsController extends AdminController
         if ($ctx instanceof JsonResponse) {
             return $ctx;
         }
-        [$locationId, $from, $to] = $ctx;
-        [$where, $params] = $this->scope($locationId, $from, $to, 'a');
+        [$locationId, $from, $to, , $accountId] = $ctx;
+        [$where, $params] = $this->scope($locationId, $accountId, $from, $to, 'a');
         $where .= " AND a.status = 'no_show'";
 
         $rows = $this->db->fetchAllAssociative(
@@ -344,7 +344,7 @@ final class AdminReportsController extends AdminController
      *
      * @return array{0: string, 1: list<string|int>}
      */
-    private function scope(?int $locationId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $alias = ''): array
+    private function scope(?int $locationId, int $accountId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $alias = ''): array
     {
         $p = $alias !== '' ? $alias . '.' : '';
         $where = "{$p}start_at >= ? AND {$p}start_at < ?";
@@ -353,8 +353,13 @@ final class AdminReportsController extends AdminController
             $to->setTimezone(new \DateTimeZone('UTC'))->format('c'),
         ];
         if ($locationId !== null) {
+            // La sede ya quedó verificada como de la cuenta en context().
             $where .= " AND {$p}location_id = ?";
             $params[] = $locationId;
+        } else {
+            // admin_cadena sin sede fija: agrega SOLO sobre las sedes de su cuenta.
+            $where .= " AND {$p}location_id IN (SELECT id FROM location WHERE account_id = ?)";
+            $params[] = $accountId;
         }
 
         return [$where, $params];
@@ -363,11 +368,12 @@ final class AdminReportsController extends AdminController
     /**
      * Resuelve usuario, sede y rango [from, to) de fechas locales.
      *
-     * @return array{0: int|null, 1: \DateTimeImmutable, 2: \DateTimeImmutable, 3: \DateTimeZone}|JsonResponse
+     * @return array{0: int|null, 1: \DateTimeImmutable, 2: \DateTimeImmutable, 3: \DateTimeZone, 4: int}|JsonResponse
      */
     private function context(Request $request, bool $requireLocation): array|JsonResponse
     {
         $user = self::user($request);
+        $accountId = $user['account_id'];
         try {
             $this->auth->assertRole($user, self::REPORT_ROLES);
             $requested = $request->query->get('location_id');
@@ -382,7 +388,8 @@ final class AdminReportsController extends AdminController
 
         $tz = new \DateTimeZone('Europe/Madrid');
         if ($locationId !== null) {
-            $tzName = $this->db->fetchOne('SELECT timezone FROM location WHERE id = ?', [$locationId]);
+            // La sede debe ser de la cuenta del usuario (aísla a admin_cadena de otras cuentas).
+            $tzName = $this->db->fetchOne('SELECT timezone FROM location WHERE id = ? AND account_id = ?', [$locationId, $accountId]);
             if ($tzName === false) {
                 return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);
             }
@@ -400,7 +407,7 @@ final class AdminReportsController extends AdminController
             return $this->error('VALIDATION', 'El rango de fechas es inválido (to debe ser >= from).', 400);
         }
 
-        return [$locationId, $from->setTime(0, 0), $to, $tz];
+        return [$locationId, $from->setTime(0, 0), $to, $tz, $accountId];
     }
 
     private function parseDate(mixed $raw, \DateTimeZone $tz): ?\DateTimeImmutable

@@ -36,12 +36,13 @@ final class AdminReviewController extends AdminController
         }
 
         $pg = self::pagination($request);
+        $accountId = $user['account_id'];
 
         return $this->json([
-            'reviews' => $this->reviews->listForLocation($locationId, $pg['per_page'], $pg['offset']),
+            'reviews' => $this->reviews->listForLocation($locationId, $accountId, $pg['per_page'], $pg['offset']),
             'page' => $pg['page'],
             'per_page' => $pg['per_page'],
-            'total' => $this->reviews->countForLocation($locationId),
+            'total' => $this->reviews->countForLocation($locationId, $accountId),
         ]);
     }
 
@@ -57,6 +58,6 @@ final class AdminReviewController extends AdminController
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
 
-        return $this->json($this->reviews->aggregates($locationId));
+        return $this->json($this->reviews->aggregates($locationId, $user['account_id']));
     }
 }

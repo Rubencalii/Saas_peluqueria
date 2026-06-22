@@ -1,6 +1,6 @@
 # 15 · Plan: Multi-tenant + Suscripciones (SaaS multi-salón)
 
-> **Estado: Fase 1 implementada (cimientos); Fases 2-6 pendientes.** Hoy el sistema es **mono-cadena**: un
+> **Estado: Fases 1-2 implementadas (cimientos + aislamiento del panel); Fases 3-6 pendientes.** Hoy el sistema es **mono-cadena**: un
 > único negocio con varias sedes. Para venderlo como SaaS a **muchos salones
 > independientes** hay que añadir aislamiento por inquilino (tenant) y
 > facturación del propio software. Es un cambio arquitectónico que toca casi
@@ -109,7 +109,7 @@ plan `free`/trial. Email de bienvenida (canal de email ya existe).
 | Fase | Qué | Riesgo |
 |------|-----|--------|
 | **1. Cimientos** ✅ | `0014`: `account`/`plan`/`subscription`, cuenta principal (datos actuales) y `account_id` en las tablas raíz con DEFAULT. **El JWT ya lleva `account_id`** y hay `GET /admin/account`. | Bajo (aditivo) — **hecho** |
-| **2. Scoping panel** | `account_id` en el JWT + `TenantContext`; filtrar todas las consultas del panel; cambiar unicidades a por-tenant. Tests de aislamiento (un tenant no ve datos de otro). | **Alto** (toca todas las queries) |
+| **2. Scoping panel** ✅ | `0015`: unicidades por-cuenta (`location.slug`, `customer.phone`; el email de `app_user` se mantiene global). **Todas** las consultas del panel filtran por `account_id` del JWT (CRUD raíz, agenda, citas, informes, conversaciones, lista de espera, bloqueos, valoraciones, recurrencias, auditoría); `assertLocationAccount()` impide que admin_cadena alcance sedes de otra cuenta. Test funcional de aislamiento. | **Hecho** |
 | **3. Público multi-tenant** | Resolución por dominio/slug en web; por `phone_number_id` en el bot. | Medio |
 | **4. RLS** | Políticas Row-Level Security como red de seguridad. | Medio |
 | **5. Billing** | Stripe Billing + webhook + límites de plan + estados de cuenta. | Medio |
@@ -119,17 +119,24 @@ Cada fase es un PR independiente con su batería de tests. La fase 2 es la
 crítica: conviene apoyarla en **RLS (fase 4 adelantada)** para que un descuido
 no provoque fuga de datos entre salones.
 
-## 8. Decisiones abiertas (requieren producto)
+## 8. Decisiones de producto
 
-1. **Login**: ¿email único global (un usuario, varios tenants) o por-tenant
-   (mismo email en salones distintos)? Afecta a `app_user` y al flujo de login.
-2. **Planes y precios**: ¿qué límites por plan? ¿hay plan gratis?
-3. **Dominio**: ¿subdominio (`salon.reservas.app`), dominio propio por salón, o
-   slug en la ruta? (el modelo ya guarda `branding.custom_domain`).
-4. **WhatsApp**: ¿una línea de Meta por salón (recomendado para aislamiento) o
-   compartida? Determina cómo resuelve el tenant el bot.
-5. **Migración de datos actuales**: la cadena existente pasa a ser el primer
-   tenant.
+Resueltas (2026-06-22):
+
+1. **Login**: ✅ **email único global** (un email = un usuario = una cuenta).
+   `app_user.email` se mantiene global; el login no exige elegir salón.
+2. **Dominio**: ✅ **subdominio por slug** (`salon.reservas.app`). La resolución
+   del tenant en la web (Fase 3) será por subdominio.
+3. **WhatsApp**: ✅ **una línea de Meta por salón**; el bot resolverá el tenant
+   por el `phone_number_id` (Fase 3).
+4. **Migración de datos actuales**: ✅ la cadena existente es la cuenta `principal`
+   (id 1), creada en la Fase 1.
+
+Pendiente:
+
+5. **Planes y precios**: límites por plan y si hay plan gratis. *Decisión
+   aplazada*: el catálogo `plan` queda con free/pro/cadena como están; se concreta
+   al abordar el billing (Fase 5).
 
 ## 9. Recomendación
 

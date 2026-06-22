@@ -90,6 +90,35 @@ final class TenantIsolationTest extends WebTestCase
 
         // La sede del tenant 1 sigue intacta.
         self::assertSame('Salón Centro', $this->db->fetchOne('SELECT name FROM location WHERE id = 1'));
+
+        // Servicios y clientes: el tenant 2 arranca vacío aunque el tenant 1 tenga datos.
+        self::assertNotEmpty($this->getJson('/api/v1/admin/services', $token1)['services']);
+        self::assertSame([], $this->getJson('/api/v1/admin/services', $token2)['services']);
+        self::assertSame(0, $this->getJson('/api/v1/admin/customers', $token2)['total']);
+
+        // El tenant 1 no puede ver una cita del tenant 2 (creada directamente en BD).
+        $foreignCustomer = (int) $this->db->fetchOne(
+            "INSERT INTO customer (account_id, name, phone) VALUES (?, 'Cliente Ajeno', '+34699111222') RETURNING id",
+            [$accountId]
+        );
+        $foreignService = (int) $this->db->fetchOne(
+            "INSERT INTO service (account_id, name, duration_min, buffer_min, price)
+             VALUES (?, 'Corte Ajeno', 30, 0, 10) RETURNING id",
+            [$accountId]
+        );
+        $foreignAppt = (int) $this->db->fetchOne(
+            "INSERT INTO appointment (customer_id, service_id, location_id, start_at, end_at, status, channel, public_code)
+             VALUES (?, ?, ?, now() + interval '1 day', now() + interval '1 day' + interval '30 min', 'confirmada', 'manual', 'aj-001')
+             RETURNING id",
+            [$foreignCustomer, $foreignService, $foreignLocId]
+        );
+        $this->client->request(
+            'PATCH',
+            '/api/v1/admin/appointments/' . $foreignAppt,
+            server: ['HTTP_AUTHORIZATION' => 'Bearer ' . $token1, 'CONTENT_TYPE' => 'application/json'],
+            content: (string) json_encode(['status' => 'cancelada'])
+        );
+        self::assertSame(404, $this->client->getResponse()->getStatusCode());
     }
 
     private function login(string $email, string $password): string

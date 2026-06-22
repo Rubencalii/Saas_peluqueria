@@ -44,8 +44,8 @@ final class AdminTimeBlockController extends AdminController
         $sql = 'SELECT tb.id, tb.staff_id, tb.location_id, tb.start_at, tb.end_at, tb.reason, s.name AS staff_name
                   FROM time_block tb
                   JOIN staff s ON s.id = tb.staff_id
-                 WHERE tb.start_at < ? AND tb.end_at > ?';
-        $params = [$to->format('c'), $from->format('c')];
+                 WHERE s.account_id = ? AND tb.start_at < ? AND tb.end_at > ?';
+        $params = [$user['account_id'], $to->format('c'), $from->format('c')];
         if ($locationId !== null) {
             $sql .= ' AND (tb.location_id = ? OR tb.location_id IS NULL)';
             $params[] = $locationId;
@@ -83,6 +83,10 @@ final class AdminTimeBlockController extends AdminController
         if ($staffId <= 0) {
             return $this->error('VALIDATION', 'staff_id es obligatorio.', 400);
         }
+        // El profesional debe ser de la cuenta del usuario.
+        if ($this->db->fetchOne('SELECT 1 FROM staff WHERE id = ? AND account_id = ?', [$staffId, $user['account_id']]) === false) {
+            return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
+        }
         $start = $this->parseInstant($payload['start'] ?? null);
         $end = $this->parseInstant($payload['end'] ?? null);
         if ($start === null || $end === null || $end <= $start) {
@@ -94,6 +98,7 @@ final class AdminTimeBlockController extends AdminController
             : null;
         if ($locationId !== null) {
             try {
+                $this->auth->assertLocationAccount($user, $locationId);
                 $this->auth->assertLocation($user, $locationId);
             } catch (AuthException $e) {
                 return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
@@ -124,7 +129,12 @@ final class AdminTimeBlockController extends AdminController
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
 
-        $block = $this->db->fetchAssociative('SELECT location_id FROM time_block WHERE id = ?', [$id]);
+        $block = $this->db->fetchAssociative(
+            'SELECT tb.location_id FROM time_block tb
+               JOIN staff s ON s.id = tb.staff_id
+              WHERE tb.id = ? AND s.account_id = ?',
+            [$id, $user['account_id']]
+        );
         if ($block === false) {
             return $this->error('NOT_FOUND', 'Bloqueo no encontrado.', 404);
         }

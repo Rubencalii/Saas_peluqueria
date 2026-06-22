@@ -84,10 +84,10 @@ final class RecurringService
     /**
      * @return list<array<string, mixed>>
      */
-    public function listForLocation(?int $locationId): array
+    public function listForLocation(?int $locationId, int $accountId): array
     {
-        $where = 'r.active';
-        $params = [];
+        $where = 'r.active AND r.location_id IN (SELECT id FROM location WHERE account_id = ?)';
+        $params = [$accountId];
         if ($locationId !== null) {
             $where .= ' AND r.location_id = ?';
             $params[] = $locationId;

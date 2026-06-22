@@ -140,6 +140,24 @@ final class AuthService
     }
 
     /**
+     * Multi-tenant: verifica que la sede pertenece a la cuenta del usuario.
+     * Se usa además de assertLocation() porque admin_cadena pasa esa comprobación
+     * para cualquier sede, pero nunca debe alcanzar la de OTRA cuenta. Devuelve
+     * NOT_FOUND (no FORBIDDEN) para no revelar la existencia de sedes ajenas.
+     *
+     * @param array{account_id: int} $user
+     *
+     * @throws AuthException
+     */
+    public function assertLocationAccount(array $user, int $locationId): void
+    {
+        $accountId = $this->db->fetchOne('SELECT account_id FROM location WHERE id = ?', [$locationId]);
+        if ($accountId === false || (int) $accountId !== $user['account_id']) {
+            throw new AuthException('NOT_FOUND', 'Sede no encontrada.', 404);
+        }
+    }
+
+    /**
      * Exige que el usuario tenga uno de los roles indicados.
      *
      * @param array{role: string} $user

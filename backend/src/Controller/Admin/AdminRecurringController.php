@@ -38,7 +38,7 @@ final class AdminRecurringController extends AdminController
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
 
-        return $this->json(['recurring' => $this->recurring->listForLocation($locationId)]);
+        return $this->json(['recurring' => $this->recurring->listForLocation($locationId, $user['account_id'])]);
     }
 
     #[Route('/api/v1/admin/recurring', name: 'admin_recurring_create', methods: ['POST'])]
@@ -55,6 +55,7 @@ final class AdminRecurringController extends AdminController
 
         try {
             $this->auth->assertRole($user, self::ROLES);
+            $this->auth->assertLocationAccount($user, $locationId);
             $this->auth->assertLocation($user, $locationId);
             $result = $this->recurring->create(
                 $locationId,
@@ -88,6 +89,7 @@ final class AdminRecurringController extends AdminController
             return $this->error('NOT_FOUND', 'Recurrencia no encontrada.', 404);
         }
         try {
+            $this->auth->assertLocationAccount($user, $locationId);
             $this->auth->assertLocation($user, $locationId);
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);

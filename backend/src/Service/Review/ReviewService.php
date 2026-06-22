@@ -57,9 +57,9 @@ final class ReviewService
         return ['review_id' => (int) $id];
     }
 
-    public function countForLocation(?int $locationId): int
+    public function countForLocation(?int $locationId, int $accountId): int
     {
-        [$where, $params] = $this->scope($locationId);
+        [$where, $params] = $this->scope($locationId, $accountId);
 
         return (int) $this->db->fetchOne(
             "SELECT COUNT(*) FROM review r JOIN appointment a ON a.id = r.appointment_id WHERE $where",
@@ -72,9 +72,9 @@ final class ReviewService
      *
      * @return list<array<string, mixed>>
      */
-    public function listForLocation(?int $locationId, int $limit, int $offset): array
+    public function listForLocation(?int $locationId, int $accountId, int $limit, int $offset): array
     {
-        [$where, $params] = $this->scope($locationId);
+        [$where, $params] = $this->scope($locationId, $accountId);
 
         $rows = $this->db->fetchAllAssociative(
             "SELECT r.id, r.rating, r.comment, r.created_at,
@@ -105,9 +105,9 @@ final class ReviewService
      *
      * @return array<string, mixed>
      */
-    public function aggregates(?int $locationId): array
+    public function aggregates(?int $locationId, int $accountId): array
     {
-        [$where, $params] = $this->scope($locationId);
+        [$where, $params] = $this->scope($locationId, $accountId);
         $base = "FROM review r JOIN appointment a ON a.id = r.appointment_id";
 
         $overall = $this->db->fetchAssociative(
@@ -146,14 +146,20 @@ final class ReviewService
     }
 
     /**
+     * Filtro multi-tenant: siempre acota a las sedes de la cuenta; si se indica
+     * una sede concreta, además la fija.
+     *
      * @return array{0: string, 1: list<int>}
      */
-    private function scope(?int $locationId): array
+    private function scope(?int $locationId, int $accountId): array
     {
+        $where = 'a.location_id IN (SELECT id FROM location WHERE account_id = ?)';
+        $params = [$accountId];
         if ($locationId !== null) {
-            return ['a.location_id = ?', [$locationId]];
+            $where .= ' AND a.location_id = ?';
+            $params[] = $locationId;
         }
 
-        return ['TRUE', []];
+        return [$where, $params];
     }
 }

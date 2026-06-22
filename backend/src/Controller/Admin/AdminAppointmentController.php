@@ -49,6 +49,7 @@ final class AdminAppointmentController extends AdminController
         $locationId = (int) ($payload['location_id'] ?? 0);
         try {
             $this->auth->assertLocation($user, $locationId);
+            $this->auth->assertLocationAccount($user, $locationId);
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
@@ -140,7 +141,7 @@ final class AdminAppointmentController extends AdminController
     /**
      * Carga una cita y comprueba que el usuario tiene acceso a su sede.
      *
-     * @param array{role: string, location_id: int|null} $user
+     * @param array{role: string, location_id: int|null, account_id: int} $user
      *
      * @return array<string, mixed>|JsonResponse  fila de la cita, o respuesta de error
      */
@@ -152,6 +153,7 @@ final class AdminAppointmentController extends AdminController
         }
         try {
             $this->auth->assertLocation($user, (int) $row['location_id']);
+            $this->auth->assertLocationAccount($user, (int) $row['location_id']);
         } catch (AuthException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }

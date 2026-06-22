@@ -39,13 +39,18 @@ final class AdminConversationController extends AdminController
         if ($onlyPending) {
             $where[] = 'c.needs_human';
         }
+        // Multi-tenant: solo conversaciones de las sedes de la cuenta (o aún sin
+        // sede asignada, que el bot resolverá por línea de WhatsApp en la Fase 3).
+        $where[] = '(c.location_id IS NULL OR c.location_id IN (SELECT id FROM location WHERE account_id = ?))';
+        $params[] = $user['account_id'];
         // Salvo admin_cadena, solo la sede propia (y las aún sin sede asignada).
         if ($user['role'] !== 'admin_cadena') {
             $where[] = '(c.location_id = ? OR c.location_id IS NULL)';
             $params[] = $user['location_id'];
         }
 
-        $whereSql = $where !== [] ? ' WHERE ' . implode(' AND ', $where) : '';
+        // Siempre hay al menos el filtro por cuenta.
+        $whereSql = ' WHERE ' . implode(' AND ', $where);
         $pg = self::pagination($request);
 
         $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM conversation c$whereSql", $params);
@@ -88,6 +93,11 @@ final class AdminConversationController extends AdminController
             [$waId]
         );
         if ($conv === false) {
+            return $this->error('NOT_FOUND', 'Conversación no encontrada.', 404);
+        }
+        // Multi-tenant: si la conversación tiene sede, debe ser de la cuenta.
+        if ($conv['location_id'] !== null
+            && $this->db->fetchOne('SELECT 1 FROM location WHERE id = ? AND account_id = ?', [(int) $conv['location_id'], $user['account_id']]) === false) {
             return $this->error('NOT_FOUND', 'Conversación no encontrada.', 404);
         }
         if ($user['role'] !== 'admin_cadena'
