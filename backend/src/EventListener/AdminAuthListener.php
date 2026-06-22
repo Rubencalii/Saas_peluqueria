@@ -6,6 +6,7 @@ namespace App\EventListener;
 
 use App\Service\Auth\AuthException;
 use App\Service\Auth\AuthService;
+use Doctrine\DBAL\Connection;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
@@ -24,8 +25,13 @@ final class AdminAuthListener
 {
     public const ATTR = 'auth_user';
 
-    public function __construct(private readonly AuthService $auth)
-    {
+    /** Métodos de solo lectura: siempre permitidos aunque la cuenta esté suspendida. */
+    private const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+
+    public function __construct(
+        private readonly AuthService $auth,
+        private readonly Connection $db,
+    ) {
     }
 
     public function __invoke(RequestEvent $event): void
@@ -54,7 +60,22 @@ final class AdminAuthListener
             return;
         }
 
+        // Multi-tenant (doc 15, Fase 5): una cuenta suspendida/cancelada (p. ej. por
+        // impago) queda en SOLO LECTURA; se bloquean las escrituras con 402.
+        if (!in_array($request->getMethod(), self::READ_METHODS, true) && $this->accountSuspended($user['account_id'])) {
+            $event->setResponse($this->deny('ACCOUNT_SUSPENDED', 'Tu cuenta está suspendida. Regulariza la suscripción para seguir operando.', 402));
+
+            return;
+        }
+
         $request->attributes->set(self::ATTR, $user);
+    }
+
+    private function accountSuspended(int $accountId): bool
+    {
+        $status = $this->db->fetchOne('SELECT status FROM account WHERE id = ?', [$accountId]);
+
+        return $status === 'suspended' || $status === 'cancelled';
     }
 
     private function deny(string $code, string $message, int $status): JsonResponse

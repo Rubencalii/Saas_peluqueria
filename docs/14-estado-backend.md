@@ -33,8 +33,8 @@
 | Multi-tenant Fase 2 (aislamiento del panel: unicidad por-cuenta + scoping de todas las consultas del panel) | ✅ |
 | Multi-tenant Fase 3 (público por subdominio + bot por línea de WhatsApp; cliente en la cuenta de la sede) | ✅ |
 | Multi-tenant Fase 6 (alta de salón: `POST /api/v1/signup` → cuenta+admin+sede en trial) | ✅ |
-| Multi-tenant Fase 5 parcial (límites de plan: rechaza crear sede/profesional por encima del plan) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 60 tests |
+| Multi-tenant Fase 5 parcial (límites de plan + cuenta suspendida en solo lectura) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 61 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack

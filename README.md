@@ -59,7 +59,7 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - **Fase 2** ✅ aislamiento del panel: unicidad por-cuenta (`location.slug`, `customer.phone`) y scoping por `account_id` de **todas** las consultas del panel, con test funcional de aislamiento
   - **Fase 3** ✅ público multi-tenant: la web resuelve la cuenta por **subdominio** (`TenantResolver`) y el bot por la **línea de WhatsApp** (`account.wa_phone_number_id` + `phone_number_id` del webhook); el catálogo y los endpoints públicos se acotan a la cuenta y el cliente se crea en la cuenta de la sede
   - **Fase 6** ✅ alta de salón: `POST /api/v1/signup` crea cuenta (`trial`) + suscripción `free` + primera sede + administrador y devuelve sesión (email de bienvenida best-effort)
-  - **Fase 5** 🟡 parcial: **límites de plan** (`PlanLimitService` rechaza crear sede/profesional por encima del plan, 402); falta el billing con Stripe (Subscriptions + webhook + cuenta suspendida por impago)
+  - **Fase 5** 🟡 parcial: **límites de plan** (`PlanLimitService` rechaza crear sede/profesional por encima del plan, 402) y **cuenta suspendida ⇒ solo lectura** (las escrituras del panel devuelven 402); falta el billing con Stripe (Subscriptions + webhook que marque la cuenta como suspendida/activa)
   - ⏳ Pendiente: RLS (red de seguridad en BD) y billing con Stripe
 
 ### Pendiente
