@@ -503,6 +503,42 @@ paths:
   /api/v1/admin/reports/ratings:
     get: { tags: [Panel], summary: "Nota media (global, por profesional y servicio)", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
 
+  /api/v1/admin/recurring:
+    get:
+      tags: [Panel]
+      summary: "Citas recurrentes (por sede)"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: location_id, in: query, schema: { type: integer } }]
+      responses: { "200": { description: Recurrencias } }
+    post:
+      tags: [Panel]
+      summary: "Crear una recurrencia para un cliente"
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [location_id, service_id, weekday, time, customer]
+              properties:
+                location_id: { type: integer }
+                service_id: { type: integer }
+                staff_id: { type: [integer, "null"] }
+                weekday: { type: integer, minimum: 0, maximum: 6, description: "0=lun..6=dom" }
+                time: { type: string, example: "09:00" }
+                interval_weeks: { type: integer, minimum: 1, maximum: 52, default: 4 }
+                customer: { $ref: "#/components/schemas/CustomerInput" }
+      responses: { "201": { description: Creada }, "400": { $ref: "#/components/responses/Error" } }
+
+  /api/v1/admin/recurring/{id}:
+    delete:
+      tags: [Panel]
+      summary: "Desactivar una recurrencia"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Desactivada }, "404": { $ref: "#/components/responses/Error" } }
+
   # ---------------------------------------------------------------- Webhooks
   /api/v1/webhooks/whatsapp:
     get:

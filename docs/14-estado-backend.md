@@ -3,7 +3,7 @@
 > Actualización a **2026-06-21**. Inventario de lo implementado en `backend/`
 > (Symfony 7 + PHP 8.5, Doctrine DBAL sobre PostgreSQL) y backlog técnico
 > pendiente. El backend está **completo**: núcleo + backlog del doc 13 +
-> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 50 tests).
+> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 56 tests).
 > Lo que queda del proyecto es el **frontend**.
 
 ## 1. Resumen
@@ -25,7 +25,8 @@
 | Operación: CORS, health check, OpenAPI, CI (GitHub Actions) | ✅ |
 | RGPD (doc 09): export, anonimización, baja de consentimiento | ✅ |
 | Fidelización por puntos (1 pt/€ al completar cita) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 53 tests |
+| Citas recurrentes (cron genera la próxima) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 56 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -68,6 +69,7 @@ php bin/phpunit
 | `0010_audit_log.sql` | Registro de actividad del panel (auditoría) |
 | `0011_reviews.sql` | Valoraciones post-cita |
 | `0012_loyalty.sql` | Fidelización por puntos |
+| `0013_recurring.sql` | Citas recurrentes |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -114,6 +116,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | Informes | `GET /admin/reports/{occupancy,no-shows,bookings-by-channel,revenue,peak-hours,retention,no-show-customers}` |
 | Auditoría | `GET /admin/audit` (registro de actividad, solo admin_cadena) |
 | Valoraciones | `GET /admin/reviews` (paginado) · `GET /admin/reports/ratings` (nota media por profesional/servicio) |
+| Recurrentes | `GET` `POST /admin/recurring` · `DELETE /admin/recurring/{id}` |
 
 **Roles:** `recepcion`, `profesional`, `admin_sede`, `admin_cadena` (autorización por sede; el catálogo y las sedes los gobierna `admin_cadena`).
 
@@ -134,6 +137,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | `app:notifications:dispatch` | Entrega las notificaciones vencidas por WhatsApp |
 | `app:notifications:return-reminders` | "Te toca volver" a clientes lapsados (`--weeks`, `--window`) |
 | `app:waitlist:notify` | Avisa a la lista de espera al liberarse un hueco |
+| `app:recurring:generate` | Crea la próxima cita de las recurrencias activas |
 
 ## 7. Variables de entorno
 
@@ -159,7 +163,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**53 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
+**56 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
 
 ```bash
 cd backend && php bin/phpunit
@@ -194,7 +198,8 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 - ✅ *Resuelto (2026-06-21):* **audit log** de acciones del panel (listener en `kernel.terminate` → tabla `audit_log`; consulta en `GET /admin/audit`).
 - ✅ *Resuelto (2026-06-21):* **valoración post-cita** (envío público por código + lista y agregados en el panel).
 - ✅ *Resuelto (2026-06-21):* **fidelización por puntos** (abono al completar cita; saldo e historial en la ficha del cliente).
-- Pendiente: citas recurrentes, i18n de mensajes.
+- ✅ *Resuelto (2026-06-21):* **citas recurrentes** (plantilla + cron `app:recurring:generate` que materializa la próxima cita).
+- Pendiente: i18n de mensajes.
 
 ### Frontend (fuera de backend)
 - **Panel de administración** y **web pública de reserva** (consumen esta API).
