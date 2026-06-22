@@ -65,7 +65,9 @@ final class WhatsAppWebhookController extends AbstractController
             if (!$this->markProcessed($msg['id'])) {
                 continue; // reintento de Meta: ya procesado
             }
-            $this->bot->handle($msg['from'], $msg['text'], $msg['interactive']);
+            // Multi-tenant: la línea de WhatsApp (phone_number_id) identifica la cuenta.
+            $accountId = $this->accountForLine($msg['phone_number_id']);
+            $this->bot->handle($msg['from'], $msg['text'], $msg['interactive'], $accountId);
         }
 
         return $this->json(['ok' => true]);
@@ -76,13 +78,16 @@ final class WhatsAppWebhookController extends AbstractController
      *
      * @param array<string, mixed> $payload
      *
-     * @return list<array{id: string, from: string, text: string|null, interactive: string|null}>
+     * @return list<array{id: string, from: string, text: string|null, interactive: string|null, phone_number_id: string|null}>
      */
     private function extractMessages(array $payload): array
     {
         $out = [];
         foreach ($payload['entry'] ?? [] as $entry) {
             foreach ($entry['changes'] ?? [] as $change) {
+                $phoneNumberId = isset($change['value']['metadata']['phone_number_id'])
+                    ? (string) $change['value']['metadata']['phone_number_id']
+                    : null;
                 foreach ($change['value']['messages'] ?? [] as $m) {
                     if (!isset($m['id'], $m['from'])) {
                         continue;
@@ -92,12 +97,27 @@ final class WhatsAppWebhookController extends AbstractController
                         'from' => (string) $m['from'],
                         'text' => isset($m['text']['body']) ? (string) $m['text']['body'] : null,
                         'interactive' => $this->interactiveId($m),
+                        'phone_number_id' => $phoneNumberId,
                     ];
                 }
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Cuenta asociada a una línea de WhatsApp (phone_number_id). 0 si no hay
+     * línea o no casa con ninguna cuenta → el bot cae en la cuenta principal.
+     */
+    private function accountForLine(?string $phoneNumberId): int
+    {
+        if ($phoneNumberId === null || $phoneNumberId === '') {
+            return 0;
+        }
+        $id = $this->db->fetchOne('SELECT id FROM account WHERE wa_phone_number_id = ?', [$phoneNumberId]);
+
+        return $id === false ? 0 : (int) $id;
     }
 
     /**

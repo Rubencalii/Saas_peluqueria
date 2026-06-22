@@ -66,7 +66,9 @@ final class WaitlistService
         return $this->db->transactional(function (Connection $tx) use (
             $locationId, $serviceId, $staffId, $name, $phone, $waConsent, $desiredDate
         ): array {
-            $customerId = $this->upsertCustomer($tx, $name, $phone, $waConsent);
+            // El tenant lo determina la sede.
+            $accountId = (int) $tx->fetchOne('SELECT account_id FROM location WHERE id = ?', [$locationId]);
+            $customerId = $this->upsertCustomer($tx, $accountId, $name, $phone, $waConsent);
 
             // El índice único parcial evita duplicados mientras status='esperando'.
             $id = $tx->fetchOne(
@@ -167,11 +169,11 @@ final class WaitlistService
         $this->db->executeStatement("UPDATE waitlist SET status = 'cancelado' WHERE id = ?", [$id]);
     }
 
-    private function upsertCustomer(Connection $tx, string $name, string $phone, bool $waConsent): int
+    private function upsertCustomer(Connection $tx, int $accountId, string $name, string $phone, bool $waConsent): int
     {
         return (int) $tx->fetchOne(
-            'INSERT INTO customer (name, phone, wa_consent, consent_at)
-             VALUES (?, ?, ?, CASE WHEN ? THEN now() END)
+            'INSERT INTO customer (account_id, name, phone, wa_consent, consent_at)
+             VALUES (?, ?, ?, ?, CASE WHEN ? THEN now() END)
              ON CONFLICT (account_id, phone) DO UPDATE SET
                  name       = EXCLUDED.name,
                  wa_consent = customer.wa_consent OR EXCLUDED.wa_consent,
@@ -180,8 +182,8 @@ final class WaitlistService
                      ELSE customer.consent_at
                  END
              RETURNING id',
-            [$name, $phone, $waConsent, $waConsent],
-            [2 => ParameterType::BOOLEAN, 3 => ParameterType::BOOLEAN]
+            [$accountId, $name, $phone, $waConsent, $waConsent],
+            [3 => ParameterType::BOOLEAN, 4 => ParameterType::BOOLEAN]
         );
     }
 

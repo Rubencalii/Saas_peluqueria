@@ -124,4 +124,63 @@ final class AppointmentServiceTest extends DatabaseTestCase
         $status = $this->db->fetchOne('SELECT status FROM appointment WHERE id = ?', [$a['appointment_id']]);
         self::assertSame('cancelada', $status);
     }
+
+    /**
+     * Multi-tenant (doc 15, Fase 3): el cliente se crea en la cuenta de la sede,
+     * no siempre en la principal. Montamos una segunda cuenta replicando la
+     * sede/servicio/profesional/horario del seed y reservamos en ella.
+     */
+    public function testElClienteSeCreaEnLaCuentaDeLaSede(): void
+    {
+        $accountId = (int) $this->db->fetchOne(
+            "INSERT INTO account (name, slug, status) VALUES ('Cadena 2', 'cadena-2', 'active') RETURNING id"
+        );
+        $locId = (int) $this->db->fetchOne(
+            "INSERT INTO location (account_id, name, slug, timezone, active)
+             VALUES (?, 'Sede 2', 'sede-2', 'Europe/Madrid', TRUE) RETURNING id",
+            [$accountId]
+        );
+        $svcId = (int) $this->db->fetchOne(
+            "INSERT INTO service (account_id, name, duration_min, buffer_min, price, active)
+             VALUES (?, 'Corte', 30, 0, 12, TRUE) RETURNING id",
+            [$accountId]
+        );
+        $this->db->executeStatement(
+            'INSERT INTO service_segment (service_id, position, minutes, busy) VALUES (?, 1, 30, TRUE)',
+            [$svcId]
+        );
+        $this->db->executeStatement('INSERT INTO service_location (service_id, location_id) VALUES (?, ?)', [$svcId, $locId]);
+        $staffId = (int) $this->db->fetchOne(
+            "INSERT INTO staff (account_id, name, active) VALUES (?, 'Pro 2', TRUE) RETURNING id",
+            [$accountId]
+        );
+        $this->db->executeStatement('INSERT INTO staff_location (staff_id, location_id) VALUES (?, ?)', [$staffId, $locId]);
+        $this->db->executeStatement('INSERT INTO staff_service (staff_id, service_id) VALUES (?, ?)', [$staffId, $svcId]);
+        $this->db->executeStatement(
+            "INSERT INTO staff_schedule (staff_id, location_id, weekday, start_time, end_time)
+             VALUES (?, ?, 0, '09:00', '14:00')",
+            [$staffId, $locId]
+        );
+
+        $offer = $this->availability->find($locId, $svcId, null, $this->nextMonday());
+        self::assertNotEmpty($offer['slots'], 'La sede 2 debe ofrecer huecos.');
+
+        $phone = '+34600999000';
+        $res = $this->appointments->create([
+            'location_id' => $locId,
+            'service_id' => $svcId,
+            'staff_id' => null,
+            'start' => $offer['slots'][0]['start'],
+            'customer' => ['name' => 'Cliente 2', 'phone' => $phone],
+            'channel' => 'web',
+        ]);
+        self::assertSame('confirmada', $res['status']);
+
+        // El cliente queda en la cuenta 2; el mismo teléfono puede existir en la 1.
+        $accountOfCustomer = (int) $this->db->fetchOne(
+            'SELECT account_id FROM customer WHERE phone = ? ORDER BY account_id DESC LIMIT 1',
+            [$phone]
+        );
+        self::assertSame($accountId, $accountOfCustomer);
+    }
 }

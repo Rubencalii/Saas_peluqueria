@@ -57,15 +57,16 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
 - 🟡 Multi-tenant / SaaS multi-salón (doc 15), en curso:
   - **Fase 1** ✅ cimientos: tablas `account`/`plan`/`subscription`, cuenta `principal` con los datos actuales, `account_id` en las tablas raíz y en el JWT, `GET /api/v1/admin/account`
   - **Fase 2** ✅ aislamiento del panel: unicidad por-cuenta (`location.slug`, `customer.phone`) y scoping por `account_id` de **todas** las consultas del panel, con test funcional de aislamiento
-  - ⏳ Pendiente: público multi-tenant (subdominio + bot por `phone_number_id`), RLS, billing (Stripe Subscriptions) y onboarding
+  - **Fase 3** ✅ público multi-tenant: la web resuelve la cuenta por **subdominio** (`TenantResolver`) y el bot por la **línea de WhatsApp** (`account.wa_phone_number_id` + `phone_number_id` del webhook); el catálogo y los endpoints públicos se acotan a la cuenta y el cliente se crea en la cuenta de la sede
+  - ⏳ Pendiente: RLS (red de seguridad en BD), billing (Stripe Subscriptions + límites de plan) y onboarding/signup
 
 ### Pendiente
 
 - ⏳ Panel de administración (frontend)
 - ⏳ Web pública de reserva
-- ⏳ Multi-tenant Fases 3-6 (público/RLS/billing/onboarding, doc 15)
+- ⏳ Multi-tenant Fases 4-6 (RLS/billing/onboarding, doc 15)
 
-> El **backend mono-cadena está funcionalmente completo** (núcleo + todo el backlog del doc 13) y el **multi-tenant** avanza por fases (1-2 hechas). Lo que queda es **frontend** y las fases de multi-tenant público/billing.
+> El **backend mono-cadena está funcionalmente completo** (núcleo + todo el backlog del doc 13) y el **multi-tenant** avanza por fases (1-3 hechas: panel y público aislados por cuenta). Lo que queda es **frontend** y las fases de multi-tenant RLS/billing/onboarding.
 
 ## Arranque rápido (base de datos)
 

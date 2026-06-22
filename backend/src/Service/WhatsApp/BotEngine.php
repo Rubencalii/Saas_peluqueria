@@ -21,6 +21,14 @@ final class BotEngine
 {
     private const DAYS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 
+    /**
+     * Cuenta (tenant) de la conversación en curso. La fija handle() a partir de
+     * la línea de WhatsApp (phone_number_id → cuenta); si no se conoce, cae en la
+     * cuenta principal. Todas las consultas de catálogo/cliente del bot se acotan
+     * a ella (multi-tenant Fase 3, doc 15).
+     */
+    private int $accountId = 0;
+
     public function __construct(
         private readonly Connection $db,
         private readonly AvailabilityService $availability,
@@ -37,9 +45,14 @@ final class BotEngine
      * @param string      $waId        Número del cliente (id de WhatsApp, solo dígitos).
      * @param string|null $text        Texto libre del mensaje, si lo hay.
      * @param string|null $interactive Id de la respuesta de botón/lista, si la hay.
+     * @param int         $accountId   Cuenta resuelta por la línea de WhatsApp (0 = principal).
      */
-    public function handle(string $waId, ?string $text, ?string $interactive): void
+    public function handle(string $waId, ?string $text, ?string $interactive, int $accountId = 0): void
     {
+        $this->accountId = $accountId > 0
+            ? $accountId
+            : (int) $this->db->fetchOne('SELECT id FROM account ORDER BY id LIMIT 1');
+
         $phone = '+' . ltrim($waId, '+');
         $input = $interactive ?? mb_strtolower(trim((string) $text));
         $conv = $this->load($waId);
@@ -174,21 +187,27 @@ final class BotEngine
         $last = $this->db->fetchOne(
             'SELECT a.location_id FROM appointment a
                JOIN customer c ON c.id = a.customer_id
-              WHERE c.phone = ? ORDER BY a.start_at DESC LIMIT 1',
-            [$phone]
+              WHERE c.phone = ? AND c.account_id = ? ORDER BY a.start_at DESC LIMIT 1',
+            [$phone, $this->accountId]
         );
         if ($last !== false) {
             return (int) $last;
         }
 
-        $first = $this->db->fetchOne('SELECT id FROM location WHERE active ORDER BY id LIMIT 1');
+        $first = $this->db->fetchOne(
+            'SELECT id FROM location WHERE active AND account_id = ? ORDER BY id LIMIT 1',
+            [$this->accountId]
+        );
 
         return $first === false ? null : (int) $first;
     }
 
     private function startReserveAi(string $waId, int $locationId, ?int $serviceId, ?int $staffId): void
     {
-        $locations = $this->db->fetchAllAssociative('SELECT id FROM location WHERE active ORDER BY id');
+        $locations = $this->db->fetchAllAssociative(
+            'SELECT id FROM location WHERE active AND account_id = ? ORDER BY id',
+            [$this->accountId]
+        );
 
         // Multi-sede sin saber cuál: arrancamos el flujo normal (elige sede primero).
         if (count($locations) !== 1) {
@@ -274,7 +293,10 @@ final class BotEngine
 
     private function startReserve(string $waId): void
     {
-        $locations = $this->db->fetchAllAssociative('SELECT id, name FROM location WHERE active ORDER BY name');
+        $locations = $this->db->fetchAllAssociative(
+            'SELECT id, name FROM location WHERE active AND account_id = ? ORDER BY name',
+            [$this->accountId]
+        );
 
         if (count($locations) === 1) {
             $this->askService($waId, ['data' => ['location_id' => (int) $locations[0]['id']]]);
@@ -731,7 +753,10 @@ final class BotEngine
     /** Retira el consentimiento de avisos por WhatsApp (RGPD doc 09 §3). */
     private function optOut(string $phone): void
     {
-        $this->db->executeStatement('UPDATE customer SET wa_consent = FALSE WHERE phone = ?', [$phone]);
+        $this->db->executeStatement(
+            'UPDATE customer SET wa_consent = FALSE WHERE phone = ? AND account_id = ?',
+            [$phone, $this->accountId]
+        );
     }
 
     // -----------------------------------------------------------------
@@ -741,7 +766,10 @@ final class BotEngine
     /** @return array{id: int, name: string}|null */
     private function customerByPhone(string $phone): ?array
     {
-        $row = $this->db->fetchAssociative('SELECT id, name FROM customer WHERE phone = ?', [$phone]);
+        $row = $this->db->fetchAssociative(
+            'SELECT id, name FROM customer WHERE phone = ? AND account_id = ?',
+            [$phone, $this->accountId]
+        );
 
         return $row === false ? null : ['id' => (int) $row['id'], 'name' => (string) $row['name']];
     }
@@ -757,12 +785,12 @@ final class BotEngine
                JOIN service  s ON s.id = a.service_id
                LEFT JOIN staff st ON st.id = a.staff_id
                JOIN location l ON l.id = a.location_id
-              WHERE c.phone = ?
+              WHERE c.phone = ? AND c.account_id = ?
                 AND a.status IN (\'pendiente\', \'confirmada\')
                 AND a.end_at >= now()
               ORDER BY a.start_at
               LIMIT 1',
-            [$phone]
+            [$phone, $this->accountId]
         );
 
         return $row === false ? null : $row;

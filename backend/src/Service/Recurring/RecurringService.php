@@ -65,10 +65,12 @@ final class RecurringService
         $id = $this->db->transactional(function (Connection $tx) use (
             $locationId, $serviceId, $staffId, $name, $phone, $weekday, $timeLocal, $intervalWeeks
         ): int {
+            // El tenant lo determina la sede.
+            $accountId = (int) $tx->fetchOne('SELECT account_id FROM location WHERE id = ?', [$locationId]);
             $customerId = (int) $tx->fetchOne(
-                'INSERT INTO customer (name, phone) VALUES (?, ?)
+                'INSERT INTO customer (account_id, name, phone) VALUES (?, ?, ?)
                  ON CONFLICT (account_id, phone) DO UPDATE SET name = EXCLUDED.name RETURNING id',
-                [$name, $phone]
+                [$accountId, $name, $phone]
             );
 
             return (int) $tx->fetchOne(

@@ -1,6 +1,6 @@
 # 15 · Plan: Multi-tenant + Suscripciones (SaaS multi-salón)
 
-> **Estado: Fases 1-2 implementadas (cimientos + aislamiento del panel); Fases 3-6 pendientes.** Hoy el sistema es **mono-cadena**: un
+> **Estado: Fases 1-3 implementadas (cimientos + aislamiento del panel + público/bot por tenant); Fases 4-6 pendientes.** Hoy el sistema es **mono-cadena**: un
 > único negocio con varias sedes. Para venderlo como SaaS a **muchos salones
 > independientes** hay que añadir aislamiento por inquilino (tenant) y
 > facturación del propio software. Es un cambio arquitectónico que toca casi
@@ -110,7 +110,7 @@ plan `free`/trial. Email de bienvenida (canal de email ya existe).
 |------|-----|--------|
 | **1. Cimientos** ✅ | `0014`: `account`/`plan`/`subscription`, cuenta principal (datos actuales) y `account_id` en las tablas raíz con DEFAULT. **El JWT ya lleva `account_id`** y hay `GET /admin/account`. | Bajo (aditivo) — **hecho** |
 | **2. Scoping panel** ✅ | `0015`: unicidades por-cuenta (`location.slug`, `customer.phone`; el email de `app_user` se mantiene global). **Todas** las consultas del panel filtran por `account_id` del JWT (CRUD raíz, agenda, citas, informes, conversaciones, lista de espera, bloqueos, valoraciones, recurrencias, auditoría); `assertLocationAccount()` impide que admin_cadena alcance sedes de otra cuenta. Test funcional de aislamiento. | **Hecho** |
-| **3. Público multi-tenant** | Resolución por dominio/slug en web; por `phone_number_id` en el bot. | Medio |
+| **3. Público multi-tenant** ✅ | `TenantResolver` resuelve la web por subdominio; `0016` añade `account.wa_phone_number_id` y el webhook resuelve el bot por la línea de Meta. El catálogo y los endpoints públicos (disponibilidad, reserva, lista de espera) se acotan a la cuenta; el cliente se crea en la cuenta de la sede. Test funcional de subdominio. | **Hecho** |
 | **4. RLS** | Políticas Row-Level Security como red de seguridad. | Medio |
 | **5. Billing** | Stripe Billing + webhook + límites de plan + estados de cuenta. | Medio |
 | **6. Onboarding** | `signup`, trial, email de bienvenida, portal de cliente de Stripe. | Bajo |

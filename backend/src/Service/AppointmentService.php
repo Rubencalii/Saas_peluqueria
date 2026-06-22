@@ -104,7 +104,9 @@ final class AppointmentService
             $locationId, $serviceId, $staffId, $start, $end,
             $name, $phone, $email, $waConsent, $channel, $idempotencyKey, $publicCode
         ): array {
-            $customerId = $this->upsertCustomer($tx, $name, $phone, $email, $waConsent);
+            // El tenant lo determina la sede: el cliente se crea/actualiza en su cuenta.
+            $accountId = (int) $tx->fetchOne('SELECT account_id FROM location WHERE id = ?', [$locationId]);
+            $customerId = $this->upsertCustomer($tx, $accountId, $name, $phone, $email, $waConsent);
 
             try {
                 $appointmentId = (int) $tx->fetchOne(
@@ -169,14 +171,15 @@ final class AppointmentService
 
     private function upsertCustomer(
         Connection $tx,
+        int $accountId,
         string $name,
         string $phone,
         ?string $email,
         bool $waConsent
     ): int {
         return (int) $tx->fetchOne(
-            'INSERT INTO customer (name, phone, email, wa_consent, consent_at)
-             VALUES (?, ?, ?, ?, CASE WHEN ? THEN now() END)
+            'INSERT INTO customer (account_id, name, phone, email, wa_consent, consent_at)
+             VALUES (?, ?, ?, ?, ?, CASE WHEN ? THEN now() END)
              ON CONFLICT (account_id, phone) DO UPDATE SET
                  name       = EXCLUDED.name,
                  email      = COALESCE(EXCLUDED.email, customer.email),
@@ -186,8 +189,8 @@ final class AppointmentService
                      ELSE customer.consent_at
                  END
              RETURNING id',
-            [$name, $phone, $email, $waConsent, $waConsent],
-            [3 => ParameterType::BOOLEAN, 4 => ParameterType::BOOLEAN]
+            [$accountId, $name, $phone, $email, $waConsent, $waConsent],
+            [4 => ParameterType::BOOLEAN, 5 => ParameterType::BOOLEAN]
         );
     }
 
