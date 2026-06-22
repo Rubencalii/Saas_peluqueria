@@ -128,6 +128,12 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 > **Degradación**: WhatsApp, IA y Stripe se **desactivan solos** si no hay credenciales, así que el backend funciona en local sin cuentas externas.
 
+### Gestión de secretos
+
+- Los archivos versionados (`.env`, `.env.dev`, `.env.test`) contienen **solo marcadores**, nunca secretos reales.
+- El **secreto real de producción** (`APP_SECRET`, claves de WhatsApp/Anthropic/Stripe) va en **`.env.local`** (ignorado por git) o en variables de entorno del servidor.
+- En despliegue, generar un `APP_SECRET` fuerte y aleatorio (firma los JWT del panel).
+
 ## 8. Tests
 
 **34 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera y feed iCal.
@@ -144,6 +150,7 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 - Verificar la **firma del webhook de WhatsApp** (`X-Hub-Signature-256`); hoy el `POST` de Meta se acepta sin validar.
 - **Rate limiting en el login** (`/auth/login`) — protección anti fuerza bruta.
 - **Reset de contraseña** del panel y, opcional, **revocación/refresh** del JWT.
+- ✅ *Resuelto (2026-06-21):* se retiró un `APP_SECRET` de alta entropía que estaba en `.env.dev` (alerta de GitGuardian). Los `.env` versionados ya solo llevan marcadores; los secretos reales van en `.env.local`. *(El valor antiguo, un secreto de desarrollo sin acceso a ningún servicio, permanece en el historial de git; purgarlo requeriría reescribir el historial.)*
 
 ### 🟠 Cumplimiento (RGPD, doc 09)
 - **Export y borrado/anonimización** de datos de un cliente.
