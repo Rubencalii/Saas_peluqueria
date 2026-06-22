@@ -466,6 +466,16 @@ paths:
   /api/v1/admin/reports/no-show-customers:
     get: { tags: [Panel], summary: "Clientes con más ausencias", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
 
+  /api/v1/admin/audit:
+    get:
+      tags: [Panel]
+      summary: "Registro de actividad del panel (solo admin_cadena, paginado)"
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/PerPage" }
+      responses: { "200": { description: "Auditoría + { page, per_page, total }" }, "403": { $ref: "#/components/responses/Error" } }
+
   # ---------------------------------------------------------------- Webhooks
   /api/v1/webhooks/whatsapp:
     get:

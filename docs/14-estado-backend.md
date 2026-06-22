@@ -63,6 +63,7 @@ php bin/phpunit
 | `0007_staff_calendar_token.sql` | Token de feed iCal por profesional |
 | `0008_payments.sql` | Depósito por servicio + tabla `payment` |
 | `0009_password_reset.sql` | Token de reset de contraseña del panel |
+| `0010_audit_log.sql` | Registro de actividad del panel (auditoría) |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -106,6 +107,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | Atención humana (WhatsApp) | `GET /admin/conversations` · `POST /admin/conversations/{waId}/reply` |
 | Lista de espera | `GET /admin/waitlist` · `DELETE /admin/waitlist/{id}` |
 | Informes | `GET /admin/reports/{occupancy,no-shows,bookings-by-channel,revenue,peak-hours,retention,no-show-customers}` |
+| Auditoría | `GET /admin/audit` (registro de actividad, solo admin_cadena) |
 
 **Roles:** `recepcion`, `profesional`, `admin_sede`, `admin_cadena` (autorización por sede; el catálogo y las sedes los gobierna `admin_cadena`).
 
@@ -183,7 +185,8 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 > Con esto el bloque 🟡 queda cubierto: el frontend ya tiene contrato (OpenAPI), CORS y health, y la CI protege cada cambio.
 
 ### ⚪ Producto (prioridad baja)
-- Valoración post-cita, fidelización/puntos, citas recurrentes, audit log de acciones del panel, i18n de mensajes.
+- ✅ *Resuelto (2026-06-21):* **audit log** de acciones del panel (listener en `kernel.terminate` → tabla `audit_log`; consulta en `GET /admin/audit`).
+- Pendiente: valoración post-cita, fidelización/puntos, citas recurrentes, i18n de mensajes.
 
 ### Frontend (fuera de backend)
 - **Panel de administración** y **web pública de reserva** (consumen esta API).
