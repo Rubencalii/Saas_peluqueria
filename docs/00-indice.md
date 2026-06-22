@@ -28,6 +28,7 @@ Conjunto de documentos de partida para construir una plataforma de reservas con:
 | 12 | **Manual del personal** | Guía de uso del panel para recepción y profesionales |
 | 13 | **Funcionalidades adicionales (backlog)** | Mejoras futuras y su priorización |
 | 14 | **Estado del backend** | Inventario de lo implementado y backlog técnico (actualizado) |
+| 15 | **Plan multi-tenant + suscripciones** | Diseño por fases para convertirlo en SaaS multi-salón (no implementado) |
 
 ---
 
