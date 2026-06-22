@@ -71,6 +71,10 @@ jobs:
         working-directory: backend
         run: find src -name '*.php' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
 
+      - name: Análisis estático (PHPStan)
+        working-directory: backend
+        run: php vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
       - name: Tests (PHPUnit)
         working-directory: backend
         run: php bin/phpunit

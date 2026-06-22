@@ -35,7 +35,7 @@ final class WaitlistController extends AbstractController
             $result = $this->waitlist->join(
                 (int) ($payload['location_id'] ?? 0),
                 (int) ($payload['service_id'] ?? 0),
-                isset($payload['staff_id']) && $payload['staff_id'] !== null ? (int) $payload['staff_id'] : null,
+                isset($payload['staff_id']) ? (int) $payload['staff_id'] : null,
                 is_string($customer['name'] ?? null) ? $customer['name'] : '',
                 is_string($customer['phone'] ?? null) ? $customer['phone'] : '',
                 (bool) ($payload['wa_consent'] ?? false),
@@ -45,7 +45,7 @@ final class WaitlistController extends AbstractController
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
         }
 
-        return $this->json($result, ($result['already'] ?? false) ? 200 : 201);
+        return $this->json($result, $result['already'] ? 200 : 201);
     }
 
     private function error(string $code, string $message, int $status): JsonResponse

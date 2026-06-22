@@ -45,7 +45,7 @@ final class AppointmentService
     /**
      * @param array<string, mixed> $input  Cuerpo de la petición ya decodificado.
      *
-     * @return array{appointment_id: int, status: string, staff_id: int, start: string, end: string, idempotent_replay?: bool}
+     * @return array{appointment_id: int, status: string, staff_id: int, start: string, end: string, public_code: string, idempotent_replay?: bool}
      *
      * @throws AppointmentException
      */
@@ -64,9 +64,7 @@ final class AppointmentService
 
         $locationId = $this->intField($input, 'location_id');
         $serviceId = $this->intField($input, 'service_id');
-        $requestedStaffId = isset($input['staff_id']) && $input['staff_id'] !== null
-            ? (int) $input['staff_id']
-            : null;
+        $requestedStaffId = isset($input['staff_id']) ? (int) $input['staff_id'] : null;
 
         $channel = is_string($input['channel'] ?? null) ? $input['channel'] : 'web';
         if (!in_array($channel, self::CHANNELS, true)) {

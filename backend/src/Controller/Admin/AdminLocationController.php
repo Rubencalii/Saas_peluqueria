@@ -182,35 +182,25 @@ final class AdminLocationController extends AdminController
             return $this->error('FORBIDDEN', 'Solo admin_cadena puede fijar el dominio propio.', 403);
         }
 
-        $cols = ['logo_url', 'color_primary', 'color_accent', 'font_family', 'custom_domain'];
-        $present = [];
-        $values = [];
-        foreach ($cols as $c) {
+        // Columnas presentes en el cuerpo → su valor saneado (incluida `extra`).
+        $set = [];
+        foreach (['logo_url', 'color_primary', 'color_accent', 'font_family', 'custom_domain'] as $c) {
             if (array_key_exists($c, $payload)) {
-                $present[$c] = $payload[$c] !== null && $payload[$c] !== '' ? (string) $payload[$c] : null;
+                $set[$c] = $payload[$c] !== null && $payload[$c] !== '' ? (string) $payload[$c] : null;
             }
         }
-        $extra = array_key_exists('extra', $payload) && $payload['extra'] !== null
-            ? json_encode($payload['extra'], JSON_UNESCAPED_UNICODE)
-            : null;
-
-        // UPSERT: una fila de branding por sede.
-        $insertCols = array_merge(['location_id'], array_keys($present));
-        $insertVals = array_merge([$id], array_values($present));
-        if ($extra !== null || array_key_exists('extra', $payload)) {
-            $insertCols[] = 'extra';
-            $insertVals[] = $extra;
+        if (array_key_exists('extra', $payload)) {
+            $set['extra'] = $payload['extra'] !== null ? json_encode($payload['extra'], JSON_UNESCAPED_UNICODE) : null;
         }
-        $placeholders = implode(', ', array_map(static fn (string $c): string => $c === 'extra' ? '?::jsonb' : '?', $insertCols));
-        $updates = [];
-        foreach ($insertCols as $c) {
-            if ($c !== 'location_id') {
-                $updates[] = "$c = EXCLUDED.$c";
-            }
-        }
-        if ($updates === []) {
+        if ($set === []) {
             return $this->error('VALIDATION', 'Nada que actualizar.', 400);
         }
+
+        // UPSERT: una fila de branding por sede.
+        $insertCols = ['location_id', ...array_keys($set)];
+        $insertVals = [$id, ...array_values($set)];
+        $placeholders = implode(', ', array_map(static fn (string $c): string => $c === 'extra' ? '?::jsonb' : '?', $insertCols));
+        $updates = array_map(static fn (string $c): string => "$c = EXCLUDED.$c", array_keys($set));
 
         $this->db->executeStatement(
             'INSERT INTO branding (' . implode(', ', $insertCols) . ') VALUES (' . $placeholders . ')

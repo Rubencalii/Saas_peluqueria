@@ -89,7 +89,7 @@ final class AdminTimeBlockController extends AdminController
             return $this->error('VALIDATION', 'start y end deben ser ISO 8601 con end > start.', 400);
         }
 
-        $locationId = isset($payload['location_id']) && $payload['location_id'] !== null
+        $locationId = isset($payload['location_id'])
             ? (int) $payload['location_id']
             : null;
         if ($locationId !== null) {

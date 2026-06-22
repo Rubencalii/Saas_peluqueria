@@ -248,7 +248,7 @@ final class BotEngine
             $this->waitlist->join(
                 (int) $data['location_id'],
                 (int) $data['service_id'],
-                isset($data['staff_id']) && $data['staff_id'] !== null ? (int) $data['staff_id'] : null,
+                isset($data['staff_id']) ? (int) $data['staff_id'] : null,
                 $customer['name'] ?? 'Cliente',
                 $phone,
                 true, // se apunta por WhatsApp: consiente que le avisemos
@@ -418,7 +418,7 @@ final class BotEngine
     /** @param array<string, mixed> $data */
     private function offerSlots(string $waId, string $state, array $data): void
     {
-        $staffId = isset($data['staff_id']) && $data['staff_id'] !== null ? (int) $data['staff_id'] : null;
+        $staffId = isset($data['staff_id']) ? (int) $data['staff_id'] : null;
         try {
             $offer = $this->availability->find(
                 (int) $data['location_id'],
@@ -786,7 +786,7 @@ final class BotEngine
             [(int) $data['location_id'], (int) $data['service_id']]
         );
         $loc = $this->db->fetchOne('SELECT name FROM location WHERE id = ?', [(int) $data['location_id']]);
-        $staff = isset($data['staff_id']) && $data['staff_id'] !== null
+        $staff = isset($data['staff_id'])
             ? $this->db->fetchOne('SELECT name FROM staff WHERE id = ?', [(int) $data['staff_id']])
             : 'Sin preferencia';
         $when = $this->formatLocal($data['slot_iso'], $this->locationTz((int) $data['location_id']));

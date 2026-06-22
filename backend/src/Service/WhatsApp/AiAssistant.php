@@ -157,8 +157,8 @@ final class AiAssistant
 
         return [
             'intent' => is_string($data['intent'] ?? null) ? $data['intent'] : 'otro',
-            'service_id' => isset($data['service_id']) && $data['service_id'] !== null ? (int) $data['service_id'] : null,
-            'staff_id' => isset($data['staff_id']) && $data['staff_id'] !== null ? (int) $data['staff_id'] : null,
+            'service_id' => isset($data['service_id']) ? (int) $data['service_id'] : null,
+            'staff_id' => isset($data['staff_id']) ? (int) $data['staff_id'] : null,
             'date' => is_string($data['date'] ?? null) && $data['date'] !== '' ? $data['date'] : null,
             'reply' => is_string($data['reply'] ?? null) ? $data['reply'] : '',
         ];

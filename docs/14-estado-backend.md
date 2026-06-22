@@ -178,8 +178,7 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 - ✅ *Resuelto (2026-06-21):* **CORS** en `/api/*` (`CorsListener`, orígenes configurables; preflight `OPTIONS`).
 - ✅ *Resuelto (2026-06-21):* **OpenAPI** [`docs/openapi.yaml`](openapi.yaml) (OpenAPI 3.1, 45 rutas).
 - ✅ *Resuelto (2026-06-21):* **Health check** `GET /api/v1/health` (app + BD).
-- ✅ *Resuelto (2026-06-21):* **CI** (GitHub Actions): levanta Postgres, prepara la BD de test y corre lint + 38 tests en cada push/PR.
-- ⏳ Opcional: **análisis estático (PHPStan)** en CI.
+- ✅ *Resuelto (2026-06-21):* **CI** (GitHub Actions): levanta Postgres, prepara la BD de test y corre lint + **PHPStan (nivel 5)** + los tests en cada push/PR.
 
 > Con esto el bloque 🟡 queda cubierto: el frontend ya tiene contrato (OpenAPI), CORS y health, y la CI protege cada cambio.
 

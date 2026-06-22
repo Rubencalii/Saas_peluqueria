@@ -115,7 +115,7 @@ final class AuthService
             'name' => (string) ($claims['name'] ?? ''),
             'email' => (string) ($claims['email'] ?? ''),
             'role' => (string) $claims['role'],
-            'location_id' => isset($claims['loc']) && $claims['loc'] !== null ? (int) $claims['loc'] : null,
+            'location_id' => isset($claims['loc']) ? (int) $claims['loc'] : null,
         ];
     }
 
