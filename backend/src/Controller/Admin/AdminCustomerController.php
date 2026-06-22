@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Service\Auth\AuthException;
+use App\Service\Auth\AuthService;
+use App\Service\Gdpr\GdprService;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -13,11 +16,18 @@ use Symfony\Component\Routing\Attribute\Route;
  * CRM básico del panel (docs/06 §4). El cliente es único por teléfono en toda
  * la cadena (no está ligado a una sede), así que cualquier rol del panel puede
  * buscarlo y consultar su historial.
+ *
+ * Los derechos RGPD (export y supresión, doc 09 §5) se restringen a admin.
  */
 final class AdminCustomerController extends AdminController
 {
-    public function __construct(private readonly Connection $db)
-    {
+    private const GDPR_ROLES = ['admin_sede', 'admin_cadena'];
+
+    public function __construct(
+        private readonly Connection $db,
+        private readonly AuthService $auth,
+        private readonly GdprService $gdpr,
+    ) {
     }
 
     #[Route('/api/v1/admin/customers', name: 'admin_customer_list', methods: ['GET'])]
@@ -121,6 +131,46 @@ final class AdminCustomerController extends AdminController
         $this->db->executeStatement('UPDATE customer SET ' . implode(', ', $sets) . ' WHERE id = ?', $params);
 
         return $this->detail($id);
+    }
+
+    /**
+     * RGPD: exporta todos los datos del cliente (acceso/portabilidad, doc 09 §5).
+     */
+    #[Route('/api/v1/admin/customers/{id}/export', name: 'admin_customer_export', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function export(int $id, Request $request): JsonResponse
+    {
+        try {
+            $this->auth->assertRole(self::user($request), self::GDPR_ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        $data = $this->gdpr->export($id);
+        if ($data === null) {
+            return $this->error('NOT_FOUND', 'Cliente no encontrado.', 404);
+        }
+
+        return $this->json($data);
+    }
+
+    /**
+     * RGPD: derecho de supresión. Anonimiza al cliente (borra su PII) conservando
+     * las citas por necesidad fiscal/contable (doc 09 §5).
+     */
+    #[Route('/api/v1/admin/customers/{id}', name: 'admin_customer_anonymize', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+    public function anonymize(int $id, Request $request): JsonResponse
+    {
+        try {
+            $this->auth->assertRole(self::user($request), self::GDPR_ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        if (!$this->gdpr->anonymize($id)) {
+            return $this->error('NOT_FOUND', 'Cliente no encontrado.', 404);
+        }
+
+        return $this->json(['ok' => true, 'anonymized' => true]);
     }
 
     /**

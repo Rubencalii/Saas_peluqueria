@@ -37,8 +37,11 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Informes: `GET /api/v1/admin/reports/{occupancy,no-shows,bookings-by-channel}`
   - Probado de extremo a extremo vía curl
 - ✅ Motor de notificaciones y recordatorios (doc 07): al crear/cambiar/cancelar una cita se programan automáticamente confirmación, recordatorio (24 h antes) y avisos de cambio/cancelación en la tabla `notification`. El comando `php bin/console app:notifications:dispatch` (para cron) entrega las vencidas por WhatsApp y marca `enviada`/`fallida`. Probado de extremo a extremo (con/sin consentimiento, cancelación, recordatorio futuro)
-- ✅ Suite de tests automatizados (PHPUnit, doc 10): **34 tests** sobre la lógica crítica — disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, JWT/roles, redacción de notificaciones, lista de espera, feed iCal y degradación de pagos. Integración contra BD de test aislada con rollback por transacción
-- ✅ Endurecimiento de la API (doc 06 §6): rate limiting por IP en endpoints públicos (60/min → 429 con `Retry-After`), listener global que devuelve errores uniformes en JSON bajo `/api` (404/405/500 sin filtrar detalles en prod), y runner de migraciones versionadas `php bin/console app:db:migrate` (con `--status` y `--baseline`)
+- ✅ Suite de tests automatizados (PHPUnit, doc 10): **42 tests** sobre la lógica crítica — disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, JWT/roles, redacción de notificaciones, lista de espera, feed iCal, reset de contraseña, RGPD y degradación de pagos. Integración contra BD de test aislada con rollback por transacción
+- ✅ Endurecimiento de la API (doc 06 §6): rate limiting por IP en endpoints públicos (60/min) y en el login (10/min), errores uniformes en JSON bajo `/api`, y runner de migraciones versionadas `php bin/console app:db:migrate`
+- ✅ Seguridad: firma del webhook de WhatsApp (`X-Hub-Signature-256`), reset de contraseña del panel (token de un solo uso), secretos fuera del repo
+- ✅ Operación / pre-frontend: **CORS** (`/api/*`), **health check** (`/api/v1/health`), **contrato OpenAPI** ([`docs/openapi.yaml`](docs/openapi.yaml)) y **CI** (GitHub Actions con Postgres + tests)
+- ✅ RGPD (doc 09): export de datos del cliente, anonimización (derecho de supresión) y baja de avisos ("BAJA")
 
 - ✅ IA conversacional en el bot de WhatsApp (decisión doc 00): capa de comprensión de lenguaje natural con Claude (SDK oficial, salida estructurada) que deduce intención + servicio/profesional/fecha de un mensaje libre ("quiero un corte mañana con Laura") y arranca el flujo de reserva ya existente. Se desactiva sin `ANTHROPIC_API_KEY` (el bot funciona solo con botones). Modelo configurable con `ANTHROPIC_MODEL` (por defecto `claude-opus-4-8`)
 
@@ -49,7 +52,7 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - Lista de espera (§2.4): `POST /api/v1/waitlist` (alta pública, idempotente), bandeja en el panel `GET /api/v1/admin/waitlist` + `DELETE /{id}`, botón "🔔 Avísame" en el bot cuando el día está completo, y comando `app:waitlist:notify` (cron) que avisa por WhatsApp al liberarse un hueco (reutiliza el algoritmo de disponibilidad)
   - Sincronización con calendario (§2.6): feed iCal por profesional `GET /api/v1/calendar/{token}.ics` (solo lectura, suscribible en Google/Apple Calendar) + en el panel `GET /api/v1/admin/staff/{id}/calendar` y `POST .../calendar/rotate`
   - Depósito / pago online (§2.5): depósito por servicio (`deposit_amount`) cobrado con Stripe (PaymentIntent). `POST /api/v1/appointments/{id}/deposit` devuelve el `client_secret`; `POST /api/v1/webhooks/stripe` confirma el cobro. Desacoplado de la reserva y desactivado sin `STRIPE_SECRET_KEY`
-- ✅ Runner de migraciones estrenado: `app:db:migrate --baseline` + migraciones `0006`–`0008` (waitlist, token de calendario, pagos) aplicadas a las BD dev y test
+- ✅ Runner de migraciones estrenado: `app:db:migrate --baseline` + migraciones `0006`–`0009` (waitlist, token de calendario, pagos, reset de contraseña) aplicadas a las BD dev y test
 
 ### Pendiente
 

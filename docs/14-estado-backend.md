@@ -19,7 +19,10 @@
 | Informes: ocupación, no-shows, canal, ingresos, horas punta, retención | ✅ |
 | Backlog doc 13: anti no-show, recordatorio de retorno, lista de espera, iCal, depósito Stripe | ✅ |
 | Endurecimiento: rate limiting, errores uniformes, runner de migraciones | ✅ |
-| Suite de tests (PHPUnit) | ✅ 34 tests |
+| Seguridad: firma webhook WhatsApp, rate limit login, reset de contraseña | ✅ |
+| Operación: CORS, health check, OpenAPI, CI (GitHub Actions) | ✅ |
+| RGPD (doc 09): export, anonimización, baja de consentimiento | ✅ |
+| Suite de tests (PHPUnit) | ✅ 42 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -92,6 +95,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | Agenda | `GET /admin/agenda` (día/semana por sede) |
 | Citas | `POST` `PATCH` `DELETE /admin/appointments[/ {id}]` |
 | Clientes (CRM) | `GET /admin/customers` · `GET` `PATCH /admin/customers/{id}` |
+| RGPD (clientes) | `GET /admin/customers/{id}/export` (acceso/portabilidad) · `DELETE /admin/customers/{id}` (anonimizar) — solo admin |
 | Servicios | `GET` `POST /admin/services` · `PATCH /admin/services/{id}` |
 | Personal | `GET` `POST /admin/staff` · `PATCH /admin/staff/{id}` · horario `GET` `POST /admin/staff/{id}/schedule` |
 | Calendario (iCal) | `GET /admin/staff/{id}/calendar` · `POST /admin/staff/{id}/calendar/rotate` |
@@ -142,7 +146,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**38 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal y reset de contraseña.
+**42 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos) e integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción: disponibilidad y tiempos muertos, condición de carrera (409), idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña y RGPD (export/anonimización).
 
 ```bash
 cd backend && php bin/phpunit
@@ -161,7 +165,9 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 > Con esto el bloque 🔴 de seguridad queda cubierto (salvo el refresh/revocación de JWT, opcional).
 
 ### 🟠 Cumplimiento (RGPD, doc 09)
-- **Export y borrado/anonimización** de datos de un cliente.
+- ✅ *Resuelto (2026-06-21):* **export** de datos del cliente (acceso/portabilidad) y **anonimización** (derecho de supresión, conservando las citas por necesidad fiscal) — endpoints solo admin.
+- ✅ *Resuelto (2026-06-21):* **baja de avisos por WhatsApp** ("BAJA" en el bot → retira el consentimiento).
+- ⏳ Resto del doc 09 es **organizativo/legal** (política de privacidad, RAT, contratos de encargado, banner de cookies), fuera del backend.
 
 ### 🟡 Operación / preparación para el frontend
 - ✅ *Resuelto (2026-06-21):* **CORS** en `/api/*` (`CorsListener`, orígenes configurables; preflight `OPTIONS`).

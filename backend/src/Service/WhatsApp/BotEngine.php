@@ -50,6 +50,13 @@ final class BotEngine
 
             return;
         }
+        // Baja de avisos por WhatsApp (RGPD doc 09 §3: retirada del consentimiento).
+        if (in_array($input, ['baja', 'darme de baja', 'stop', 'unsubscribe', 'no avisos'], true)) {
+            $this->optOut($phone);
+            $this->wa->sendText($waId, 'Hecho ✅ No volveremos a enviarte avisos por WhatsApp. Si cambias de idea, escríbenos "menú".');
+
+            return;
+        }
         if (in_array($input, ['menu', 'menú', 'hola', 'inicio', 'start', 'buenas'], true)) {
             $this->showMenu($waId, $phone);
 
@@ -719,6 +726,12 @@ final class BotEngine
     {
         $this->wa->sendText($waId, 'No te he entendido del todo 🤔');
         $this->showMenu($waId, $phone);
+    }
+
+    /** Retira el consentimiento de avisos por WhatsApp (RGPD doc 09 §3). */
+    private function optOut(string $phone): void
+    {
+        $this->db->executeStatement('UPDATE customer SET wa_consent = FALSE WHERE phone = ?', [$phone]);
     }
 
     // -----------------------------------------------------------------
