@@ -78,7 +78,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | `POST` | `/api/v1/appointments/{id}/deposit` | Iniciar pago del depósito (Stripe) |
 | `GET`  | `/api/v1/calendar/{token}.ics` | Feed iCal de la agenda de un profesional |
 
-> Rate limiting por IP (60/min) en: alta de reserva, lookup, disponibilidad y lista de espera.
+> Rate limiting por IP: **60/min** en alta de reserva, lookup, disponibilidad y lista de espera; **10/min** en el login del panel (anti fuerza bruta).
 
 ### 5.2 Panel (requieren `Authorization: Bearer <JWT>` + rol)
 
@@ -104,7 +104,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET`/`POST` | `/api/v1/webhooks/whatsapp` | Handshake de Meta + recepción de mensajes (dedup) |
+| `GET`/`POST` | `/api/v1/webhooks/whatsapp` | Handshake de Meta + recepción de mensajes (dedup, **firma X-Hub-Signature-256 verificada**) |
 | `POST` | `/api/v1/webhooks/stripe` | Confirmación de pago del depósito |
 
 ## 6. Comandos de consola (cron)
@@ -123,6 +123,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 | `DATABASE_URL` | Conexión PostgreSQL |
 | `APP_SECRET` | Secreto de la app **y** firma de los JWT del panel |
 | `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | Cloud API de WhatsApp (vacío → salida al log) |
+| `WHATSAPP_APP_SECRET` | Verifica la firma del webhook de Meta (vacío → no se exige firma) |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | IA del bot (vacío → solo botones) |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Depósitos (vacío → pagos desactivados) |
 
@@ -147,10 +148,10 @@ cd backend && php bin/phpunit
 Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de producción / del frontend:
 
 ### 🔴 Seguridad
-- Verificar la **firma del webhook de WhatsApp** (`X-Hub-Signature-256`); hoy el `POST` de Meta se acepta sin validar.
-- **Rate limiting en el login** (`/auth/login`) — protección anti fuerza bruta.
-- **Reset de contraseña** del panel y, opcional, **revocación/refresh** del JWT.
-- ✅ *Resuelto (2026-06-21):* se retiró un `APP_SECRET` de alta entropía que estaba en `.env.dev` (alerta de GitGuardian). Los `.env` versionados ya solo llevan marcadores; los secretos reales van en `.env.local`. *(El valor antiguo, un secreto de desarrollo sin acceso a ningún servicio, permanece en el historial de git; purgarlo requeriría reescribir el historial.)*
+- ✅ *Resuelto (2026-06-21):* **firma del webhook de WhatsApp** (`X-Hub-Signature-256`) verificada con HMAC del app secret (degrada sin `WHATSAPP_APP_SECRET`).
+- ✅ *Resuelto (2026-06-21):* **rate limiting en el login** (`/auth/login`, 10/min por IP) contra fuerza bruta.
+- ✅ *Resuelto (2026-06-21):* se retiró el `APP_SECRET` de alta entropía de los `.env` versionados (alerta de GitGuardian) y se **purgó del historial de git** (reescritura + force-push). Los secretos reales van en `.env.local`.
+- ⏳ **Reset de contraseña** del panel y, opcional, **revocación/refresh** del JWT.
 
 ### 🟠 Cumplimiento (RGPD, doc 09)
 - **Export y borrado/anonimización** de datos de un cliente.

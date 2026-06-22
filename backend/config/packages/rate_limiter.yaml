@@ -6,3 +6,8 @@ framework:
             policy: 'sliding_window'
             limit: 60
             interval: '1 minute'
+        # Login del panel: límite estricto por IP para frenar la fuerza bruta.
+        auth_login:
+            policy: 'sliding_window'
+            limit: 10
+            interval: '1 minute'

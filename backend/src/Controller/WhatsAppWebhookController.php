@@ -27,6 +27,7 @@ final class WhatsAppWebhookController extends AbstractController
         private readonly BotEngine $bot,
         private readonly Connection $db,
         private readonly string $verifyToken,
+        private readonly string $appSecret,
     ) {
     }
 
@@ -47,7 +48,15 @@ final class WhatsAppWebhookController extends AbstractController
     #[Route('/api/v1/webhooks/whatsapp', name: 'whatsapp_receive', methods: ['POST'])]
     public function receive(Request $request): JsonResponse
     {
-        $payload = json_decode($request->getContent(), true);
+        $body = $request->getContent();
+
+        // Autenticidad: Meta firma el cuerpo con el app secret (X-Hub-Signature-256).
+        // Sin firma válida, el webhook quedaría abierto a inyección de mensajes falsos.
+        if (!$this->signatureValid($request, $body)) {
+            return new JsonResponse(['error' => ['code' => 'INVALID_SIGNATURE', 'message' => 'Firma inválida.']], 403);
+        }
+
+        $payload = json_decode($body, true);
         if (!is_array($payload)) {
             return $this->json(['ok' => true]); // nada que procesar
         }
@@ -108,6 +117,26 @@ final class WhatsAppWebhookController extends AbstractController
             'list_reply' => (string) ($interactive['list_reply']['id'] ?? ''),
             default => null,
         };
+    }
+
+    /**
+     * Verifica la firma HMAC-SHA256 del cuerpo (cabecera X-Hub-Signature-256).
+     * Si no hay app secret configurado (entorno local), no se exige firma.
+     */
+    private function signatureValid(Request $request, string $body): bool
+    {
+        if ($this->appSecret === '') {
+            return true; // modo local: sin secreto no se valida
+        }
+
+        $header = (string) $request->headers->get('X-Hub-Signature-256', '');
+        if (!str_starts_with($header, 'sha256=')) {
+            return false;
+        }
+
+        $expected = 'sha256=' . hash_hmac('sha256', $body, $this->appSecret);
+
+        return hash_equals($expected, $header);
     }
 
     private function markProcessed(string $messageId): bool

@@ -11,16 +11,19 @@ use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 /**
- * Rate limiting de los endpoints públicos de reserva (docs/06 §6).
+ * Rate limiting de endpoints públicos (docs/06 §6).
  *
- * Limita por IP el alta de citas, la consulta de disponibilidad y el lookup,
- * que no requieren login y son los expuestos a abuso/scraping. Los endpoints
- * del panel quedan fuera (van autenticados) y el webhook de WhatsApp también
- * (lo llama Meta). Al superar el límite responde 429 con cabecera Retry-After.
+ * - Endpoints de reserva (sin login, expuestos a abuso/scraping): 60/min por IP.
+ * - Login del panel: límite estricto (10/min por IP) para frenar la fuerza bruta.
+ *
+ * El resto del panel queda fuera (va autenticado) y el webhook de WhatsApp
+ * también (lo llama Meta y ya valida firma). Al superar el límite: 429 + Retry-After.
  */
 #[AsEventListener(event: KernelEvents::REQUEST, priority: 12)]
 final class PublicRateLimitListener
 {
+    private const LOGIN_PATH = '/api/v1/auth/login';
+
     /** @var list<array{method: string, path: string}> */
     private const PROTECTED = [
         ['method' => 'POST', 'path' => '/api/v1/appointments'],
@@ -29,8 +32,10 @@ final class PublicRateLimitListener
         ['method' => 'POST', 'path' => '/api/v1/waitlist'],
     ];
 
-    public function __construct(private readonly RateLimiterFactoryInterface $publicApiLimiter)
-    {
+    public function __construct(
+        private readonly RateLimiterFactoryInterface $publicApiLimiter,
+        private readonly RateLimiterFactoryInterface $authLimiter,
+    ) {
     }
 
     public function __invoke(RequestEvent $event): void
@@ -40,13 +45,25 @@ final class PublicRateLimitListener
         }
 
         $request = $event->getRequest();
-        if (!$this->isProtected($request->getMethod(), $request->getPathInfo())) {
+        $method = $request->getMethod();
+        $path = $request->getPathInfo();
+        $ip = $request->getClientIp() ?? 'anon';
+
+        // El login usa su propio limitador estricto.
+        if ($method === 'POST' && $path === self::LOGIN_PATH) {
+            $this->enforce($event, $this->authLimiter->create('login:' . $ip));
+
             return;
         }
 
-        $limiter = $this->publicApiLimiter->create($request->getClientIp() ?? 'anon');
-        $limit = $limiter->consume(1);
+        if ($this->isProtected($method, $path)) {
+            $this->enforce($event, $this->publicApiLimiter->create($ip));
+        }
+    }
 
+    private function enforce(RequestEvent $event, \Symfony\Component\RateLimiter\LimiterInterface $limiter): void
+    {
+        $limit = $limiter->consume(1);
         if (!$limit->isAccepted()) {
             $retryAfter = max(1, $limit->getRetryAfter()->getTimestamp() - time());
             $event->setResponse(new JsonResponse(
