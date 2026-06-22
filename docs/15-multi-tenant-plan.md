@@ -1,6 +1,6 @@
 # 15 · Plan: Multi-tenant + Suscripciones (SaaS multi-salón)
 
-> **Estado: diseño (no implementado).** Hoy el sistema es **mono-cadena**: un
+> **Estado: Fase 1 implementada (cimientos); Fases 2-6 pendientes.** Hoy el sistema es **mono-cadena**: un
 > único negocio con varias sedes. Para venderlo como SaaS a **muchos salones
 > independientes** hay que añadir aislamiento por inquilino (tenant) y
 > facturación del propio software. Es un cambio arquitectónico que toca casi
@@ -108,7 +108,7 @@ plan `free`/trial. Email de bienvenida (canal de email ya existe).
 
 | Fase | Qué | Riesgo |
 |------|-----|--------|
-| **1. Cimientos** | Migración: `account`, `plan`, `subscription`. Añadir `account_id` **nullable** a las tablas raíz; crear un *tenant por defecto* y backfill de todo lo existente; luego `NOT NULL`. | Bajo (aditivo) |
+| **1. Cimientos** ✅ | `0014`: `account`/`plan`/`subscription`, cuenta principal (datos actuales) y `account_id` en las tablas raíz con DEFAULT. **El JWT ya lleva `account_id`** y hay `GET /admin/account`. | Bajo (aditivo) — **hecho** |
 | **2. Scoping panel** | `account_id` en el JWT + `TenantContext`; filtrar todas las consultas del panel; cambiar unicidades a por-tenant. Tests de aislamiento (un tenant no ve datos de otro). | **Alto** (toca todas las queries) |
 | **3. Público multi-tenant** | Resolución por dominio/slug en web; por `phone_number_id` en el bot. | Medio |
 | **4. RLS** | Políticas Row-Level Security como red de seguridad. | Medio |

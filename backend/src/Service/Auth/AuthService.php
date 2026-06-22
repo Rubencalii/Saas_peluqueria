@@ -36,7 +36,7 @@ final class AuthService
     /**
      * Valida credenciales y devuelve token + datos del usuario.
      *
-     * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null}}
+     * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int}}
      *
      * @throws AuthException
      */
@@ -48,7 +48,7 @@ final class AuthService
         }
 
         $user = $this->db->fetchAssociative(
-            'SELECT id, name, email, password_hash, role, location_id, active
+            'SELECT id, name, email, password_hash, role, location_id, account_id, active
                FROM app_user WHERE email = ?',
             [$email]
         );
@@ -68,6 +68,7 @@ final class AuthService
             'email' => (string) $user['email'],
             'role' => (string) $user['role'],
             'location_id' => $user['location_id'] !== null ? (int) $user['location_id'] : null,
+            'account_id' => (int) $user['account_id'],
         ];
 
         $exp = time() + self::TTL_SECONDS;
@@ -82,7 +83,7 @@ final class AuthService
     /**
      * Decodifica y verifica un token. Devuelve el contexto del usuario.
      *
-     * @return array{id: int, name: string, email: string, role: string, location_id: int|null}
+     * @return array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int}
      *
      * @throws AuthException
      */
@@ -116,6 +117,7 @@ final class AuthService
             'email' => (string) ($claims['email'] ?? ''),
             'role' => (string) $claims['role'],
             'location_id' => isset($claims['loc']) ? (int) $claims['loc'] : null,
+            'account_id' => (int) ($claims['acc'] ?? 0),
         ];
     }
 
@@ -173,7 +175,7 @@ final class AuthService
     }
 
     /**
-     * @param array{id: int, name: string, email: string, role: string, location_id: int|null} $ctx
+     * @param array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int} $ctx
      */
     private function issue(array $ctx, int $exp): string
     {
@@ -184,6 +186,7 @@ final class AuthService
             'email' => $ctx['email'],
             'role' => $ctx['role'],
             'loc' => $ctx['location_id'],
+            'acc' => $ctx['account_id'],
             'iat' => time(),
             'exp' => $exp,
         ];

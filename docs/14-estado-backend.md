@@ -26,6 +26,7 @@
 | RGPD (doc 09): export, anonimización, baja de consentimiento | ✅ |
 | Fidelización por puntos (1 pt/€ al completar cita) | ✅ |
 | Citas recurrentes (cron genera la próxima) | ✅ |
+| Multi-tenant Fase 1 (cimientos: cuenta/plan/suscripción, JWT con account_id) | ✅ |
 | Suite de tests (PHPUnit) | ✅ 56 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
@@ -70,6 +71,7 @@ php bin/phpunit
 | `0011_reviews.sql` | Valoraciones post-cita |
 | `0012_loyalty.sql` | Fidelización por puntos |
 | `0013_recurring.sql` | Citas recurrentes |
+| `0014_multitenant_foundations.sql` | Multi-tenant Fase 1: `account`/`plan`/`subscription` + `account_id` |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -98,7 +100,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ### 5.2 Panel (requieren `Authorization: Bearer <JWT>` + rol)
 
-**Auth:** `POST /api/v1/auth/login` · `GET /api/v1/admin/me` · reset de contraseña `POST /api/v1/auth/password/forgot` · `POST /api/v1/auth/password/reset`
+**Auth:** `POST /api/v1/auth/login` · `GET /api/v1/admin/me` · `GET /api/v1/admin/account` (cuenta + plan) · reset `POST /api/v1/auth/password/forgot` · `POST /api/v1/auth/password/reset`
 
 | Área | Endpoints |
 |------|-----------|

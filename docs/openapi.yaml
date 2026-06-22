@@ -3,7 +3,8 @@ info:
   title: API · Reservas Multi-sede (Peluquerías)
   version: "1.0"
   description: |
-    API REST única que comparten la web pública, el bot de WhatsApp y el panel
+    API REST única que comparten la web pública, el bot de
+    WhatsApp y el panel
     (doc 06). Horas en **UTC** (ISO 8601). Endpoints del panel autenticados con
     JWT (Bearer) y autorizados por rol. Errores con forma uniforme
     `{ "error": { "code", "message" } }`.
@@ -220,6 +221,16 @@ paths:
       responses:
         "200": { description: Usuario }
         "401": { $ref: "#/components/responses/Error" }
+
+  /api/v1/admin/account:
+    get:
+      tags: [Panel]
+      summary: Cuenta (tenant) y suscripción del usuario
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Cuenta y plan }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
 
   /api/v1/admin/agenda:
     get:
