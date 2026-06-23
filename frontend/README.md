@@ -1,0 +1,40 @@
+# Frontend — Web pública de reserva
+
+Web de reserva para el cliente final (Next.js App Router + TypeScript + Tailwind v4).
+Consume la API REST del backend (`../backend`, contrato en `../docs/openapi.yaml`).
+Es la primera de las dos superficies de frontend; el **panel de administración**
+queda pendiente.
+
+## Flujo
+
+- `/` — elige salón (sedes activas de la cuenta).
+- `/[slug]` — servicios del salón y reserva: **servicio → día → hueco → datos → confirmar**.
+  El profesional lo asigna el sistema (la API pública no expone el listado de personal).
+- `/mi-cita` — consulta por teléfono + código, y **reprograma o cancela**.
+
+Multi-tenant: la cuenta (salón/cadena) la resuelve el backend por el **subdominio**
+(en local cae en la cuenta principal). El tema es **white-label** vía variables CSS
+(`--brand`, …) en `globals.css`, listo para personalizar por salón (doc 08).
+
+## Desarrollo
+
+Necesita el backend corriendo (por defecto en `http://localhost:8000`):
+
+```bash
+# 1) Backend (desde ../backend, con la BD de Docker levantada)
+php -S 127.0.0.1:8000 -t public public/index.php
+
+# 2) Frontend
+npm install
+npm run dev          # http://localhost:3000
+```
+
+Las llamadas del navegador van a rutas relativas `/api/...` que Next **reescribe**
+al backend (ver `next.config.ts`), así no hay CORS en desarrollo. Para apuntar a
+otro backend: `API_BASE=https://api.midominio.com npm run dev`.
+
+## Scripts
+
+- `npm run dev` — desarrollo.
+- `npm run build` / `npm start` — build y servidor de producción.
+- `npm run lint` — ESLint.

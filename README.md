@@ -62,12 +62,12 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
   - **Fase 5** ✅ planes y facturación: **límites de plan** (`PlanLimitService`, 402), **cuenta suspendida ⇒ solo lectura** (escrituras del panel devuelven 402, salvo facturación) y **billing con Stripe** (`BillingService`: Checkout para alta/cambio de plan, Customer Portal y webhook propio que sincroniza estado de cuenta/suscripción — impago suspende, pago reactiva). Degrada sin claves
   - **Fase 4** ✅ Row-Level Security (red de seguridad en BD): rol `peluqueria_app` sin BYPASSRLS + políticas en las tablas raíz; `TenantSessionListener` fija `app.account_id` por petición. Es *opt-in* (la web se conecta como ese rol vía `DATABASE_URL`; migraciones/cron siguen con el owner). Test dedicado que prueba el aislamiento a nivel de BD
 
-### Pendiente
+### Frontend
 
+- ✅ **Web pública de reserva** ([`frontend/`](frontend/), Next.js App Router + TypeScript + Tailwind): elegir salón → servicio → día → hueco → datos → confirmar, más **Mi cita** (consultar/reprogramar/cancelar). Consume la API vía proxy (sin CORS en dev); tema white-label por variables CSS. Build de producción verde e integración verificada contra el backend.
 - ⏳ Panel de administración (frontend)
-- ⏳ Web pública de reserva
 
-> El **backend está funcionalmente completo** (núcleo + backlog del doc 13) y el **multi-tenant está completo** (Fases 1-6, doc 15): panel y público aislados por cuenta, alta de salón, facturación con Stripe y RLS como red de seguridad. Lo único que queda del proyecto es el **frontend**.
+> El **backend está funcionalmente completo** (núcleo + backlog del doc 13) y el **multi-tenant está completo** (Fases 1-6, doc 15). En **frontend** ya está la **web pública de reserva** ([`frontend/`](frontend/)); queda el **panel de administración**.
 
 ## Arranque rápido (base de datos)
 

@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/*
+ * Tema white-label (doc 08): el aspecto sale de variables CSS, no de colores
+ * fijos. Por defecto un tema cálido de salón; un salón puede sobreescribir
+ * --brand / --brand-ink / --brand-soft (p. ej. inyectándolas en <html>).
+ */
+:root {
+  --brand: #b8895b; /* terracota/cobre, cálido de peluquería */
+  --brand-ink: #ffffff; /* texto sobre --brand */
+  --brand-soft: #f6efe8; /* fondo suave de marca */
+  --background: #fbfaf8;
+  --foreground: #221c17;
+  --muted: #6b625a;
+  --card: #ffffff;
+  --border: #e7e0d8;
+  --radius: 0.875rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-muted: var(--muted);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --radius-brand: var(--radius);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}

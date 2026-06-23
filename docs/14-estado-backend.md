@@ -38,7 +38,8 @@
 | Revocación / refresh del JWT (logout en todos los dispositivos) | ✅ |
 | i18n de mensajes al cliente (notificaciones es/en, idioma por cuenta) | ✅ |
 | Suite de tests (PHPUnit) | ✅ 68 tests |
-| Frontend (panel + web pública) | ⏳ pendiente |
+| Frontend — web pública de reserva (Next.js, `frontend/`) | ✅ |
+| Frontend — panel de administración | ⏳ pendiente |
 
 ## 2. Stack
 

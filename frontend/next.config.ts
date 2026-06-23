@@ -1,0 +1,13 @@
+import type { NextConfig } from "next";
+
+// La API del backend (Symfony). En el navegador llamamos a rutas relativas
+// `/api/...` que Next reescribe al backend → mismo origen, sin CORS en dev.
+const API_BASE = process.env.API_BASE ?? "http://localhost:8000";
+
+const nextConfig: NextConfig = {
+  async rewrites() {
+    return [{ source: "/api/:path*", destination: `${API_BASE}/api/:path*` }];
+  },
+};
+
+export default nextConfig;
