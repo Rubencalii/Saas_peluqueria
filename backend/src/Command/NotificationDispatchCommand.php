@@ -64,12 +64,13 @@ final class NotificationDispatchCommand extends Command
         $due = $this->db->fetchAllAssociative(
             "SELECT n.id, n.type, n.template_name, a.status AS appointment_status, a.start_at,
                     c.name, c.phone, c.email, c.wa_consent,
-                    s.name AS service_name, l.name AS location_name, l.timezone
+                    s.name AS service_name, l.name AS location_name, l.timezone, ac.locale
                FROM notification n
                JOIN appointment a ON a.id = n.appointment_id
                JOIN customer c    ON c.id = a.customer_id
                JOIN service  s    ON s.id = a.service_id
                JOIN location l    ON l.id = a.location_id
+               JOIN account  ac   ON ac.id = l.account_id
               WHERE n.status = 'programada' AND n.scheduled_at <= now()
               ORDER BY n.scheduled_at
               LIMIT ?",
@@ -109,6 +110,7 @@ final class NotificationDispatchCommand extends Command
                 'start_at' => (string) $n['start_at'],
                 'service_name' => (string) $n['service_name'],
                 'timezone' => (string) $n['timezone'],
+                'locale' => (string) $n['locale'],
             ]);
 
             $phone = (string) $n['phone'];

@@ -93,4 +93,25 @@ final class NotificationServiceTest extends KernelTestCase
 
         self::assertStringNotContainsString('08:30', $text);
     }
+
+    public function testLocaleEnGeneraMensajeEnIngles(): void
+    {
+        $ctx = $this->ctx('confirmacion');
+        $ctx['locale'] = 'en';
+        $text = $this->service->render($ctx);
+
+        self::assertStringContainsString('confirmed', $text);
+        self::assertStringContainsString('Wednesday', $text); // 2026-07-15 es miércoles
+        self::assertStringContainsString('10:30', $text);
+        self::assertStringNotContainsString('confirmada', $text);
+    }
+
+    public function testLocaleDesconocidoCaeEnEspanol(): void
+    {
+        $ctx = $this->ctx('confirmacion');
+        $ctx['locale'] = 'fr';
+        $text = $this->service->render($ctx);
+
+        self::assertStringContainsString('confirmada', $text);
+    }
 }

@@ -18,7 +18,14 @@ use Doctrine\DBAL\Connection;
  */
 final class NotificationService
 {
-    private const DAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+    /** Nombres de día (lun=0..dom=6) por idioma soportado. */
+    private const DAYS = [
+        'es' => ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'],
+        'en' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    ];
+
+    /** Idioma por defecto si la cuenta no fija otro. */
+    private const DEFAULT_LOCALE = 'es';
 
     /** Antelación del recordatorio antes de la cita. */
     private const REMINDER_HOURS_BEFORE = 24;
@@ -100,47 +107,83 @@ final class NotificationService
 
     /**
      * Redacta el texto de una notificación a partir de los datos de la cita
-     * (docs/07). Mensajes cortos, un emoji, con sede/fecha/hora/servicio.
+     * (docs/07). Mensajes cortos, un emoji, con sede/fecha/hora/servicio. El
+     * idioma sale de `locale` (la cuenta del salón); por defecto español.
      *
      * @param array{type: string, status: string, name: string, location_name: string,
-     *              start_at: string, service_name: string, timezone: string, template?: string} $ctx
+     *              start_at: string, service_name: string, timezone: string,
+     *              template?: string, locale?: string} $ctx
      */
     public function render(array $ctx): string
     {
-        $name = $ctx['name'] !== '' ? $ctx['name'] : 'hola';
-        $loc = $ctx['location_name'];
-        $svc = $ctx['service_name'];
-        [$fecha, $hora] = $this->formatLocal($ctx['start_at'], $ctx['timezone']);
+        $locale = $this->locale($ctx['locale'] ?? null);
+        [$fecha, $hora] = $this->formatLocal($ctx['start_at'], $ctx['timezone'], $locale);
 
-        // Plantilla de retención "te toca volver" (doc 13 §2.3, marketing).
-        if (($ctx['template'] ?? '') === 'recordatorio_retorno') {
-            return "¡Hola {$name}! ✂️ Hace ya un tiempo de tu última visita a {$loc}.\n"
-                . 'Si te apetece renovar el look, escríbenos "menú" y te buscamos hueco. ¡Te esperamos!';
-        }
+        $repl = [
+            '{name}' => $ctx['name'] !== '' ? $ctx['name'] : ($locale === 'en' ? 'there' : 'hola'),
+            '{loc}' => $ctx['location_name'],
+            '{svc}' => $ctx['service_name'],
+            '{fecha}' => $fecha,
+            '{hora}' => $hora,
+        ];
 
-        return match ($ctx['type']) {
-            'confirmacion' => "¡Hola {$name}! ✅ Tu cita en {$loc} está confirmada:\n"
-                . "🗓️ {$fecha} a las {$hora}\n✂️ {$svc}\n"
-                . 'Si necesitas cambiarla, escríbenos "menú".',
-            'recordatorio' => "¡Hola {$name}! 👋 Te recordamos tu cita de mañana en {$loc}:\n"
-                . "🗓️ {$fecha} a las {$hora} · {$svc}\n¿Confirmas que vendrás? (responde \"menú\" para gestionarla)",
-            'seguimiento' => "¡Gracias por tu visita, {$name}! 💛 ¿Qué tal la experiencia en {$loc}?\n"
+        $key = ($ctx['template'] ?? '') === 'recordatorio_retorno'
+            ? 'retorno'
+            : match ($ctx['type']) {
+                'confirmacion' => 'confirmacion',
+                'recordatorio' => 'recordatorio',
+                'seguimiento' => 'seguimiento',
+                'cambio' => $ctx['status'] === 'cancelada' ? 'cancelacion' : 'cambio',
+                default => 'generico',
+            };
+
+        return strtr(self::TEMPLATES[$locale][$key], $repl);
+    }
+
+    /** Plantillas por idioma (placeholders {name} {loc} {svc} {fecha} {hora}). */
+    private const TEMPLATES = [
+        'es' => [
+            'retorno' => "¡Hola {name}! ✂️ Hace ya un tiempo de tu última visita a {loc}.\n"
+                . 'Si te apetece renovar el look, escríbenos "menú" y te buscamos hueco. ¡Te esperamos!',
+            'confirmacion' => "¡Hola {name}! ✅ Tu cita en {loc} está confirmada:\n"
+                . "🗓️ {fecha} a las {hora}\n✂️ {svc}\n" . 'Si necesitas cambiarla, escríbenos "menú".',
+            'recordatorio' => "¡Hola {name}! 👋 Te recordamos tu cita de mañana en {loc}:\n"
+                . "🗓️ {fecha} a las {hora} · {svc}\n¿Confirmas que vendrás? (responde \"menú\" para gestionarla)",
+            'seguimiento' => "¡Gracias por tu visita, {name}! 💛 ¿Qué tal la experiencia en {loc}?\n"
                 . 'Escríbenos "menú" para reservar de nuevo cuando quieras.',
-            'cambio' => $ctx['status'] === 'cancelada'
-                ? "Hola {$name}, tu cita del {$fecha} a las {$hora} en {$loc} ha sido cancelada.\n"
-                    . 'Si quieres, escríbenos "menú" y te ayudamos a reubicarla.'
-                : "Hola {$name}, tu cita en {$loc} ha cambiado:\n🗓️ {$fecha} a las {$hora} · {$svc}",
-            default => "Hola {$name}, tienes una actualización de tu cita en {$loc}.",
-        };
+            'cancelacion' => "Hola {name}, tu cita del {fecha} a las {hora} en {loc} ha sido cancelada.\n"
+                . 'Si quieres, escríbenos "menú" y te ayudamos a reubicarla.',
+            'cambio' => "Hola {name}, tu cita en {loc} ha cambiado:\n🗓️ {fecha} a las {hora} · {svc}",
+            'generico' => 'Hola {name}, tienes una actualización de tu cita en {loc}.',
+        ],
+        'en' => [
+            'retorno' => "Hi {name}! ✂️ It's been a while since your last visit to {loc}.\n"
+                . 'If you fancy a fresh look, reply "menu" and we\'ll find you a slot. See you soon!',
+            'confirmacion' => "Hi {name}! ✅ Your appointment at {loc} is confirmed:\n"
+                . "🗓️ {fecha} at {hora}\n✂️ {svc}\n" . 'Need to change it? Just reply "menu".',
+            'recordatorio' => "Hi {name}! 👋 A reminder of your appointment tomorrow at {loc}:\n"
+                . "🗓️ {fecha} at {hora} · {svc}\nCan you make it? (reply \"menu\" to manage it)",
+            'seguimiento' => "Thanks for your visit, {name}! 💛 How was your experience at {loc}?\n"
+                . 'Reply "menu" to book again whenever you like.',
+            'cancelacion' => "Hi {name}, your appointment on {fecha} at {hora} at {loc} has been cancelled.\n"
+                . 'If you like, reply "menu" and we\'ll help you rebook.',
+            'cambio' => "Hi {name}, your appointment at {loc} has changed:\n🗓️ {fecha} at {hora} · {svc}",
+            'generico' => 'Hi {name}, there is an update to your appointment at {loc}.',
+        ],
+    ];
+
+    private function locale(?string $locale): string
+    {
+        return isset(self::TEMPLATES[$locale]) ? (string) $locale : self::DEFAULT_LOCALE;
     }
 
     /**
      * @return array{0: string, 1: string} [fecha legible, hora HH:MM] en hora local
      */
-    private function formatLocal(string $isoUtc, string $tz): array
+    private function formatLocal(string $isoUtc, string $tz, string $locale): array
     {
         $dt = (new \DateTimeImmutable($isoUtc))->setTimezone(new \DateTimeZone($tz));
-        $dia = self::DAYS[((int) $dt->format('N')) - 1];
+        $dia = self::DAYS[$locale][((int) $dt->format('N')) - 1];
 
         return [sprintf('%s %s', $dia, $dt->format('d/m')), $dt->format('H:i')];
     }

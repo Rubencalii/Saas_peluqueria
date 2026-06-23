@@ -3,7 +3,7 @@
 > Actualización a **2026-06-22**. Inventario de lo implementado en `backend/`
 > (Symfony 7 + PHP 8.5, Doctrine DBAL sobre PostgreSQL) y backlog técnico
 > pendiente. El backend está **completo**: núcleo + backlog del doc 13 +
-> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 57 tests).
+> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 68 tests).
 > El **multi-tenant** (doc 15) está **completo** (Fases 1-6): cimientos,
 > aislamiento del panel, público/bot por tenant, límites de plan + billing con
 > Stripe, alta de salón y Row-Level Security como red de seguridad en BD. Lo que
@@ -36,7 +36,8 @@
 | Multi-tenant Fase 5 (límites de plan + cuenta suspendida en solo lectura + billing con Stripe Subscriptions) | ✅ |
 | Multi-tenant Fase 4 (Row-Level Security: red de seguridad en BD, rol de app + políticas) | ✅ |
 | Revocación / refresh del JWT (logout en todos los dispositivos) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 66 tests |
+| i18n de mensajes al cliente (notificaciones es/en, idioma por cuenta) | ✅ |
+| Suite de tests (PHPUnit) | ✅ 68 tests |
 | Frontend (panel + web pública) | ⏳ pendiente |
 
 ## 2. Stack
@@ -85,6 +86,7 @@ php bin/phpunit
 | `0016_account_wa_line.sql` | Multi-tenant Fase 3: `account.wa_phone_number_id` (línea de WhatsApp por cuenta) |
 | `0017_rls.sql` | Multi-tenant Fase 4: rol `peluqueria_app` + políticas Row-Level Security |
 | `0018_session_revocation.sql` | Revocación de sesiones del panel (`app_user.token_version`) |
+| `0019_account_locale.sql` | Idioma de los mensajes por cuenta (`account.locale`) |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -183,7 +185,7 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 
 ## 8. Tests
 
-**65 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña, RGPD, el cliente creado en la cuenta de la sede, la facturación —impago→suspende, pago→reactiva, alta de suscripción— y las **políticas RLS** conectando como el rol restringido), y tests **funcionales HTTP** de multi-tenant (aislamiento del panel, resolución del público por subdominio, alta de salón con límite de plan y cuenta suspendida en solo lectura).
+**68 tests** (PHPUnit). Unitarios puros (auth/JWT, redacción de notificaciones en es/en, degradación de pagos), integración contra una BD de test aislada (`peluqueria_test`) con rollback por transacción (disponibilidad y tiempos muertos, condición de carrera 409, idempotencia, rollback de reprogramación, cancelación, lista de espera, feed iCal, reset de contraseña, RGPD, el cliente creado en la cuenta de la sede, la facturación —impago→suspende, pago→reactiva, alta de suscripción— y las **políticas RLS** conectando como el rol restringido), y tests **funcionales HTTP** de multi-tenant (aislamiento del panel, resolución del público por subdominio, alta de salón con límite de plan, cuenta suspendida en solo lectura y revocación/refresh de sesión).
 
 ```bash
 cd backend && php bin/phpunit
@@ -220,7 +222,7 @@ Funcionalmente no falta nada del MVP ni del doc 13. Lo recomendable antes de pro
 - ✅ *Resuelto (2026-06-21):* **valoración post-cita** (envío público por código + lista y agregados en el panel).
 - ✅ *Resuelto (2026-06-21):* **fidelización por puntos** (abono al completar cita; saldo e historial en la ficha del cliente).
 - ✅ *Resuelto (2026-06-21):* **citas recurrentes** (plantilla + cron `app:recurring:generate` que materializa la próxima cita).
-- Pendiente: i18n de mensajes.
+- ✅ *Resuelto (2026-06-23):* **i18n de los mensajes al cliente** (notificaciones): idioma por cuenta (`account.locale`, por defecto `es`) con catálogo **es/en**; el dispatcher pasa el idioma del salón a `NotificationService::render()`. (El bot conversacional sigue en español; queda como ampliación.)
 
 ### Frontend (fuera de backend)
 - **Panel de administración** y **web pública de reserva** (consumen esta API).
