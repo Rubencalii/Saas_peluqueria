@@ -65,9 +65,9 @@ white-label (tema propio por sede). Ver `docs/` para la especificación completa
 ### Frontend
 
 - ✅ **Web pública de reserva** ([`frontend/`](frontend/), Next.js App Router + TypeScript + Tailwind): elegir salón → servicio → día → hueco → datos → confirmar, más **Mi cita** (consultar/reprogramar/cancelar). Consume la API vía proxy (sin CORS en dev); tema white-label por variables CSS. Build de producción verde e integración verificada contra el backend.
-- ⏳ Panel de administración (frontend)
+- 🟡 **Panel de administración** (`frontend/` bajo `/panel`): login JWT, **agenda** del día (cambiar estado/cancelar citas), **clientes** (búsqueda, paginación y ficha con historial y fidelización) y **cuenta** (plan, límites y facturación con Stripe). Núcleo funcional; faltan pantallas de configuración (servicios, personal, horarios, sedes, informes, lista de espera, conversaciones).
 
-> El **backend está funcionalmente completo** (núcleo + backlog del doc 13) y el **multi-tenant está completo** (Fases 1-6, doc 15). En **frontend** ya está la **web pública de reserva** ([`frontend/`](frontend/)); queda el **panel de administración**.
+> El **backend está funcionalmente completo** (núcleo + backlog del doc 13) y el **multi-tenant está completo** (Fases 1-6, doc 15). En **frontend** están la **web pública de reserva** y el **núcleo del panel de administración** (`/panel`: login, agenda, clientes, cuenta); quedan las pantallas de configuración del panel.
 
 ## Arranque rápido (base de datos)
 

@@ -1,11 +1,14 @@
-# Frontend — Web pública de reserva
+# Frontend
 
-Web de reserva para el cliente final (Next.js App Router + TypeScript + Tailwind v4).
-Consume la API REST del backend (`../backend`, contrato en `../docs/openapi.yaml`).
-Es la primera de las dos superficies de frontend; el **panel de administración**
-queda pendiente.
+Frontend del SaaS (Next.js App Router + TypeScript + Tailwind v4) que consume la
+API REST del backend (`../backend`, contrato en `../docs/openapi.yaml`). Dos
+superficies bajo el mismo proyecto:
 
-## Flujo
+- **Web pública de reserva** (rutas en `(public)/`) — el cliente final.
+- **Panel de administración** (`/panel`) — el equipo del salón: login JWT, agenda,
+  clientes y cuenta/facturación. Núcleo funcional; faltan pantallas de configuración.
+
+## Web pública — flujo
 
 - `/` — elige salón (sedes activas de la cuenta).
 - `/[slug]` — servicios del salón y reserva: **servicio → día → hueco → datos → confirmar**.

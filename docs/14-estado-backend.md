@@ -39,7 +39,7 @@
 | i18n de mensajes al cliente (notificaciones es/en, idioma por cuenta) | ✅ |
 | Suite de tests (PHPUnit) | ✅ 68 tests |
 | Frontend — web pública de reserva (Next.js, `frontend/`) | ✅ |
-| Frontend — panel de administración | ⏳ pendiente |
+| Frontend — panel de administración (núcleo: login, agenda, clientes, cuenta) | 🟡 en curso |
 
 ## 2. Stack
 
