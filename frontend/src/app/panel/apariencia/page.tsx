@@ -40,6 +40,26 @@ export default function AparienciaPage() {
     logo_url: logo || null,
   };
 
+  function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+      setMsg({ ok: false, text: "Sube una imagen PNG, JPG o WEBP." });
+      return;
+    }
+    if (file.size > 200 * 1024) {
+      setMsg({ ok: false, text: "La imagen es muy grande (máximo 200 KB)." });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setLogo(String(reader.result));
+      setMsg(null);
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function save() {
     setSaving(true);
     setMsg(null);
@@ -87,15 +107,34 @@ export default function AparienciaPage() {
           <ColorField label="Color de marca" value={brand} fallback={DEFAULT_BRAND} onChange={setBrand} />
           <ColorField label="Color de acento" value={accent} fallback={DEFAULT_ACCENT} onChange={setAccent} />
 
-          <label className="block text-sm font-semibold">
-            Logo (URL)
-            <input
-              value={logo}
-              onChange={(e) => setLogo(e.target.value)}
-              placeholder="https://…/logo.png"
-              className="field"
-            />
-          </label>
+          <div className="text-sm font-semibold">
+            Logo
+            <div className="mt-1.5 flex items-center gap-3">
+              <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-xl border border-border bg-card">
+                {logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logo} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-muted">—</span>
+                )}
+              </div>
+              <label className="btn-ghost cursor-pointer">
+                Subir imagen
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={onLogoFile}
+                  className="hidden"
+                />
+              </label>
+              {logo ? (
+                <button type="button" onClick={() => setLogo("")} className="text-xs font-medium text-muted underline">
+                  Quitar
+                </button>
+              ) : null}
+            </div>
+            <p className="mt-1 text-xs font-normal text-muted">PNG, JPG o WEBP · máximo 200 KB.</p>
+          </div>
 
           {msg ? (
             <p className={"rounded-xl px-3 py-2 text-sm " + (msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>

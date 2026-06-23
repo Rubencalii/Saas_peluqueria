@@ -82,8 +82,8 @@ final class BrandingService
         if (array_key_exists('logo_url', $input)) {
             $v = $input['logo_url'];
             $url = $v === null || $v === '' ? null : trim((string) $v);
-            if ($url !== null && (mb_strlen($url) > 500 || !preg_match('#^https?://#i', $url))) {
-                throw new \InvalidArgumentException('El logo debe ser una URL http(s) válida.');
+            if ($url !== null && !$this->validLogo($url)) {
+                throw new \InvalidArgumentException('El logo debe ser una imagen (subida) o una URL http(s) válida.');
             }
             $sets[] = 'logo_url = ?';
             $params[] = $url;
@@ -95,5 +95,21 @@ final class BrandingService
 
         $params[] = $accountId;
         $this->db->executeStatement('UPDATE account SET ' . implode(', ', $sets) . ' WHERE id = ?', $params);
+    }
+
+    /**
+     * El logo puede ser una URL http(s) (≤500) o una imagen subida como data-URL
+     * en base64 (png/jpeg/webp/svg, hasta ~450 KB de payload).
+     */
+    private function validLogo(string $url): bool
+    {
+        if (preg_match('#^https?://#i', $url) === 1) {
+            return mb_strlen($url) <= 500;
+        }
+        if (preg_match('#^data:image/(png|jpe?g|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$#i', $url) === 1) {
+            return mb_strlen($url) <= 620000;
+        }
+
+        return false;
     }
 }
