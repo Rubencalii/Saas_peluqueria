@@ -2,6 +2,13 @@
 
 > Responde a la pregunta: *"¿puede ser el mismo backend pero con diseño propio?"* → **Sí.** Aquí está cómo.
 
+> **Estado (2026-06-23):** implementado a nivel de **cuenta** (empresa). Cada cuenta
+> guarda `display_name`, `brand_color`, `accent_color` y `logo_url` (migración 0020);
+> el admin los edita en *Panel → Apariencia* (`PATCH /api/v1/admin/account/branding`)
+> y la web de reserva los lee por subdominio (`GET /api/v1/branding`). El frontend
+> deriva toda la paleta del color de marca. La tematización **por sede** (más fina)
+> y el **dominio propio** quedan como ampliación.
+
 ## 1. La idea
 
 Un **único backend** y una **única lógica de negocio**, pero la "piel" (logo, colores, tipografía, imágenes, incluso el dominio) **cambia por sede o marca**. Es un patrón estándar llamado **multi-tenant con tematización (white-label)**.

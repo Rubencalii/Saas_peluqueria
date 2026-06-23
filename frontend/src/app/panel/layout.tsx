@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { admin, clearToken, getToken, type PanelUser } from "@/lib/admin";
+import { brandName, brandVars, type Branding } from "@/lib/theme";
 
 const NAV = [
   { href: "/panel/agenda", label: "Agenda", icon: "📅" },
   { href: "/panel/clientes", label: "Clientes", icon: "👥" },
   { href: "/panel/cuenta", label: "Cuenta", icon: "💳" },
+  { href: "/panel/apariencia", label: "Apariencia", icon: "🎨" },
 ];
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
@@ -17,6 +19,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   const isLogin = pathname === "/panel/login";
 
   const [user, setUser] = useState<PanelUser | null>(null);
+  const [branding, setBranding] = useState<Branding | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -37,6 +40,10 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
       .catch(() => {
         // adminFetch ya redirige en 401.
       });
+    admin
+      .branding()
+      .then((r) => setBranding(r.branding))
+      .catch(() => {});
   }, [isLogin, pathname, router]);
 
   if (isLogin) return <>{children}</>;
@@ -56,16 +63,21 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col md:flex-row" style={brandVars(branding)}>
       <aside className="border-b border-border bg-card md:w-60 md:shrink-0 md:border-b-0 md:border-r">
         <div className="flex items-center gap-2 px-5 py-4">
-          <span
-            className="grid h-8 w-8 place-items-center rounded-full text-brand-ink"
-            style={{ background: "var(--brand)" }}
-          >
-            ✂️
-          </span>
-          <span className="font-semibold tracking-tight">Panel</span>
+          {branding?.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={branding.logo_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+          ) : (
+            <span
+              className="grid h-8 w-8 place-items-center rounded-full text-brand-ink"
+              style={{ background: "var(--brand)" }}
+            >
+              ✂️
+            </span>
+          )}
+          <span className="truncate font-semibold tracking-tight">{brandName(branding, "Panel")}</span>
         </div>
         <nav className="flex gap-1 px-3 pb-3 md:flex-col">
           {NAV.map((item) => {

@@ -6,6 +6,7 @@ import type {
   LookupResult,
   ServicesResponse,
 } from "./types";
+import type { Branding } from "./theme";
 
 /**
  * Base de la API. En el servidor (SSR) usamos la URL absoluta del backend; en el
@@ -59,11 +60,16 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 }
 
 export const api = {
-  locations: () => request<Location[]>("/api/v1/locations", { revalidate: 60 }),
+  // Sin caché: estas respuestas dependen del Host (subdominio → cuenta). La caché
+  // de fetch de Next se indexa por URL e ignora el Host, así que cachearlas
+  // filtraría datos entre tenants. Por eso van siempre frescas (no-store).
+  locations: () => request<Location[]>("/api/v1/locations", { revalidate: 0 }),
+
+  branding: () => request<{ branding: Branding | null }>("/api/v1/branding", { revalidate: 0 }),
 
   services: (slug: string) =>
     request<ServicesResponse>(`/api/v1/locations/${encodeURIComponent(slug)}/services`, {
-      revalidate: 60,
+      revalidate: 0,
     }),
 
   availability: (params: { location_id: number; service_id: number; date: string; staff_id?: number | null }) => {

@@ -36,6 +36,15 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
         "503": { description: BD inaccesible }
 
+  /api/v1/branding:
+    get:
+      tags: [Público]
+      summary: Marca (white-label) de la cuenta del subdominio
+      responses:
+        "200":
+          description: Marca (nombre, colores, logo) o null
+          content: { application/json: { schema: { type: object, properties: { branding: { type: [object, "null"] } } } } }
+
   /api/v1/locations:
     get:
       tags: [Público]
@@ -282,6 +291,33 @@ paths:
         "200": { description: Cuenta y plan }
         "401": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/admin/account/branding:
+    get:
+      tags: [Panel]
+      summary: Marca (white-label) de la cuenta
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Marca actual }
+        "401": { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [Panel]
+      summary: Editar la marca de la cuenta — admin_cadena
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: [string, "null"] }
+                brand_color: { type: [string, "null"], description: "hex #rrggbb" }
+                accent_color: { type: [string, "null"], description: "hex #rrggbb" }
+                logo_url: { type: [string, "null"] }
+      responses:
+        "200": { description: Marca actualizada }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
 
   /api/v1/admin/billing/checkout:
     post:

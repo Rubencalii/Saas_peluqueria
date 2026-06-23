@@ -1,6 +1,8 @@
 // Cliente del panel de administración: auth JWT + llamadas autenticadas.
 // El token vive en localStorage; cada petición lleva Authorization: Bearer.
 
+import type { Branding } from "./theme";
+
 const TOKEN_KEY = "panel_token";
 
 export interface PanelUser {
@@ -176,4 +178,9 @@ export const admin = {
     adminFetch<{ url: string }>("/api/v1/admin/billing/checkout", { method: "POST", body: { plan_code: planCode } }),
 
   billingPortal: () => adminFetch<{ url: string }>("/api/v1/admin/billing/portal", { method: "POST" }),
+
+  branding: () => adminFetch<{ branding: Branding }>("/api/v1/admin/account/branding"),
+
+  updateBranding: (input: Partial<Pick<Branding, "display_name" | "brand_color" | "accent_color" | "logo_url">>) =>
+    adminFetch<{ branding: Branding }>("/api/v1/admin/account/branding", { method: "PATCH", body: input }),
 };
