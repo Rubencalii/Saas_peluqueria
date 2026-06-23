@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
 import { ErrorNote } from "@/components/ErrorNote";
@@ -39,7 +40,10 @@ export default async function LocationPage({
   return (
     <div className="space-y-6">
       <section>
-        <h1 className="text-2xl font-semibold tracking-tight">{locationName}</h1>
+        <Link href="/" className="text-sm font-medium text-muted transition hover:text-foreground">
+          ← Todos los salones
+        </Link>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">{locationName}</h1>
         <p className="mt-1 text-muted">Elige un servicio para ver los horarios disponibles.</p>
       </section>
 

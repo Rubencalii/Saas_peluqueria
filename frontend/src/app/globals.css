@@ -2,27 +2,35 @@
 
 /*
  * Tema white-label (doc 08): el aspecto sale de variables CSS, no de colores
- * fijos. Por defecto un tema cálido de salón; un salón puede sobreescribir
- * --brand / --brand-ink / --brand-soft (p. ej. inyectándolas en <html>).
+ * fijos. Paleta cálida de salón; un salón puede sobreescribir --brand* y --accent.
  */
 :root {
-  --brand: #b8895b; /* terracota/cobre, cálido de peluquería */
-  --brand-ink: #ffffff; /* texto sobre --brand */
-  --brand-soft: #f6efe8; /* fondo suave de marca */
-  --background: #fbfaf8;
-  --foreground: #221c17;
-  --muted: #6b625a;
+  --brand: #a96f43; /* cobre/terracota */
+  --brand-strong: #8c5a33; /* hover */
+  --brand-ink: #fffaf5; /* texto sobre --brand */
+  --brand-soft: #f4e9df; /* fondo suave de marca */
+  --accent: #2f7d6b; /* verde salvia para éxito/acentos */
+
+  --background: #fbf8f4;
+  --foreground: #241d17;
+  --muted: #837568;
   --card: #ffffff;
-  --border: #e7e0d8;
-  --radius: 0.875rem;
+  --border: #ece3d8;
+  --ring: #d8a878;
+
+  --radius: 1rem;
+  --shadow-soft: 0 1px 2px rgba(36, 29, 23, 0.04), 0 8px 24px -12px rgba(36, 29, 23, 0.12);
+  --shadow-lift: 0 2px 4px rgba(36, 29, 23, 0.05), 0 18px 40px -18px rgba(36, 29, 23, 0.22);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
   --color-brand-ink: var(--brand-ink);
   --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
   --color-muted: var(--muted);
   --color-card: var(--card);
   --color-border: var(--border);
@@ -32,7 +40,69 @@
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(60rem 60rem at 110% -10%, var(--brand-soft) 0%, transparent 55%),
+    var(--background);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    @apply rounded-[var(--radius-brand)] border border-border bg-card;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .card-link {
+    @apply block rounded-[var(--radius-brand)] border border-border bg-card transition duration-200;
+    box-shadow: var(--shadow-soft);
+  }
+  .card-link:hover {
+    border-color: var(--ring);
+    box-shadow: var(--shadow-lift);
+    transform: translateY(-2px);
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-brand-ink transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+    background: var(--brand);
+    box-shadow: 0 8px 20px -10px var(--brand);
+  }
+  .btn-primary:hover {
+    background: var(--brand-strong);
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-ghost:hover {
+    border-color: var(--ring);
+  }
+
+  .field {
+    @apply mt-1.5 block w-full rounded-2xl border border-border bg-card px-4 py-2.5 text-base font-normal text-foreground transition;
+  }
+  .field::placeholder {
+    color: color-mix(in srgb, var(--muted) 70%, transparent);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--ring) 30%, transparent);
+  }
+
+  .slot {
+    @apply rounded-2xl border border-border bg-card py-2.5 text-sm font-semibold transition;
+  }
+  .slot:hover {
+    border-color: var(--brand);
+    background: var(--brand-soft);
+    transform: translateY(-1px);
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+  }
 }
