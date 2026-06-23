@@ -108,9 +108,19 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
               </>
             ) : null}
           </span>
-          <button onClick={logout} className="rounded-full px-3 py-1.5 text-sm font-medium text-muted hover:bg-brand-soft hover:text-foreground">
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-2">
+            {user?.is_superadmin ? (
+              <Link
+                href="/superadmin"
+                className="rounded-full bg-foreground px-3 py-1.5 text-sm font-medium text-[var(--background)]"
+              >
+                ⚙️ Plataforma
+              </Link>
+            ) : null}
+            <button onClick={logout} className="rounded-full px-3 py-1.5 text-sm font-medium text-muted hover:bg-brand-soft hover:text-foreground">
+              Cerrar sesión
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 p-5 md:p-8">

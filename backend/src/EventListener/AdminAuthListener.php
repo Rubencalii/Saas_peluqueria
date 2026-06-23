@@ -41,7 +41,8 @@ final class AdminAuthListener
         }
 
         $request = $event->getRequest();
-        if (!str_starts_with($request->getPathInfo(), '/api/v1/admin')) {
+        $path = $request->getPathInfo();
+        if (!str_starts_with($path, '/api/v1/admin') && !str_starts_with($path, '/api/v1/superadmin')) {
             return;
         }
 
@@ -65,7 +66,6 @@ final class AdminAuthListener
         // exime la facturación: un salón impago debe poder volver a pagar.
         // Facturación y sesión (logout) se permiten siempre: un salón impago debe
         // poder pagar y cerrar sesión.
-        $path = $request->getPathInfo();
         $isExempt = str_starts_with($path, '/api/v1/admin/billing') || str_starts_with($path, '/api/v1/admin/auth');
         if (!$isExempt && !in_array($request->getMethod(), self::READ_METHODS, true) && $this->accountSuspended($user['account_id'])) {
             $event->setResponse($this->deny('ACCOUNT_SUSPENDED', 'Tu cuenta está suspendida. Regulariza la suscripción para seguir operando.', 402));

@@ -12,6 +12,24 @@ export interface PanelUser {
   role: "recepcion" | "profesional" | "admin_sede" | "admin_cadena";
   location_id: number | null;
   account_id: number;
+  is_superadmin: boolean;
+}
+
+export interface SaAccount {
+  id: number;
+  name: string;
+  slug: string;
+  status: string;
+  created_at: string;
+  plan_code: string | null;
+  plan_name: string | null;
+  subscription_status: string | null;
+  counts: { locations: number; users: number; customers: number; appointments: number };
+}
+
+export interface SaStats {
+  accounts: { total: number; active: number; trial: number; suspended: number; cancelled: number };
+  appointments_total: number;
 }
 
 export interface LoginResponse {
@@ -183,4 +201,10 @@ export const admin = {
 
   updateBranding: (input: Partial<Pick<Branding, "display_name" | "brand_color" | "accent_color" | "logo_url">>) =>
     adminFetch<{ branding: Branding }>("/api/v1/admin/account/branding", { method: "PATCH", body: input }),
+
+  // Plataforma (super-admin)
+  saStats: () => adminFetch<SaStats>("/api/v1/superadmin/stats"),
+  saAccounts: () => adminFetch<{ accounts: SaAccount[] }>("/api/v1/superadmin/accounts"),
+  saUpdateAccount: (id: number, body: { status?: string; plan_code?: string }) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/superadmin/accounts/${id}`, { method: "PATCH", body }),
 };

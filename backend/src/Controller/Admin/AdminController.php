@@ -18,11 +18,11 @@ abstract class AdminController extends AbstractController
     /**
      * Contexto del usuario autenticado, garantizado por el listener en rutas admin.
      *
-     * @return array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int}
+     * @return array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int, is_superadmin: bool}
      */
     public static function user(Request $request): array
     {
-        /** @var array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int} $user */
+        /** @var array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int, is_superadmin: bool} $user */
         $user = $request->attributes->get(AdminAuthListener::ATTR, []);
 
         return $user;

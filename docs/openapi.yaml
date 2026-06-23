@@ -319,6 +319,45 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
 
+  /api/v1/superadmin/stats:
+    get:
+      tags: [Panel]
+      summary: "Plataforma: métricas globales de cuentas (super-admin)"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Totales }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /api/v1/superadmin/accounts:
+    get:
+      tags: [Panel]
+      summary: "Plataforma: todas las cuentas con plan/estado y uso (super-admin)"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Cuentas }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /api/v1/superadmin/accounts/{id}:
+    patch:
+      tags: [Panel]
+      summary: "Plataforma: cambiar estado y/o plan de una cuenta (super-admin)"
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [active, trial, suspended, cancelled] }
+                plan_code: { type: string }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
   /api/v1/admin/billing/checkout:
     post:
       tags: [Panel]

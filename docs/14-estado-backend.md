@@ -3,7 +3,7 @@
 > Actualización a **2026-06-22**. Inventario de lo implementado en `backend/`
 > (Symfony 7 + PHP 8.5, Doctrine DBAL sobre PostgreSQL) y backlog técnico
 > pendiente. El backend está **completo**: núcleo + backlog del doc 13 +
-> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 69 tests).
+> endurecimiento (seguridad, operación, RGPD) + calidad (PHPStan, 70 tests).
 > El **multi-tenant** (doc 15) está **completo** (Fases 1-6): cimientos,
 > aislamiento del panel, público/bot por tenant, límites de plan + billing con
 > Stripe, alta de salón y Row-Level Security como red de seguridad en BD. Lo que
@@ -37,7 +37,7 @@
 | Multi-tenant Fase 4 (Row-Level Security: red de seguridad en BD, rol de app + políticas) | ✅ |
 | Revocación / refresh del JWT (logout en todos los dispositivos) | ✅ |
 | i18n de mensajes al cliente (notificaciones es/en, idioma por cuenta) | ✅ |
-| Suite de tests (PHPUnit) | ✅ 69 tests |
+| Suite de tests (PHPUnit) | ✅ 70 tests |
 | Frontend — web pública de reserva (Next.js, `frontend/`) | ✅ |
 | Frontend — panel de administración (núcleo: login, agenda, clientes, cuenta) | 🟡 en curso |
 
@@ -89,6 +89,7 @@ php bin/phpunit
 | `0018_session_revocation.sql` | Revocación de sesiones del panel (`app_user.token_version`) |
 | `0019_account_locale.sql` | Idioma de los mensajes por cuenta (`account.locale`) |
 | `0020_account_branding.sql` | Marca white-label por cuenta (`display_name`, `brand_color`, `accent_color`, `logo_url`) |
+| `0021_superadmin.sql` | Super-admin de plataforma (`app_user.is_superadmin` + usuario de plataforma) |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
@@ -122,6 +123,8 @@ Las migraciones se aplican con el runner versionado `app:db:migrate` (registra e
 **Facturación (suscripción del salón, admin_cadena):** `POST /api/v1/admin/billing/checkout` (Stripe Checkout) · `POST /api/v1/admin/billing/portal` (Customer Portal) · webhook `POST /api/v1/webhooks/stripe/billing`
 
 **Marca / white-label (doc 08):** `GET|PATCH /api/v1/admin/account/branding` (nombre, colores, logo de la cuenta; PATCH solo admin_cadena) · público `GET /api/v1/branding` (lo lee la web de reserva por subdominio)
+
+**Plataforma / super-admin (transversal a tenants, `is_superadmin`):** `GET /api/v1/superadmin/stats` · `GET /api/v1/superadmin/accounts` · `PATCH /api/v1/superadmin/accounts/{id}` (estado/plan). Autorización por el flag del JWT, no por `account_id`.
 
 | Área | Endpoints |
 |------|-----------|

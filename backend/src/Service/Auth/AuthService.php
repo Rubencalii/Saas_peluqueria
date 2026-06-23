@@ -36,7 +36,7 @@ final class AuthService
     /**
      * Valida credenciales y devuelve token + datos del usuario.
      *
-     * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int}}
+     * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int, is_superadmin: bool}}
      *
      * @throws AuthException
      */
@@ -48,7 +48,7 @@ final class AuthService
         }
 
         $user = $this->db->fetchAssociative(
-            'SELECT id, name, email, password_hash, role, location_id, account_id, token_version, active
+            'SELECT id, name, email, password_hash, role, location_id, account_id, token_version, is_superadmin, active
                FROM app_user WHERE email = ?',
             [$email]
         );
@@ -69,6 +69,7 @@ final class AuthService
             'role' => (string) $user['role'],
             'location_id' => $user['location_id'] !== null ? (int) $user['location_id'] : null,
             'account_id' => (int) $user['account_id'],
+            'is_superadmin' => (bool) $user['is_superadmin'],
         ];
 
         $exp = time() + self::TTL_SECONDS;
@@ -83,7 +84,7 @@ final class AuthService
     /**
      * Decodifica y verifica un token. Devuelve el contexto del usuario.
      *
-     * @return array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int}
+     * @return array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int, is_superadmin: bool}
      *
      * @throws AuthException
      */
@@ -128,6 +129,7 @@ final class AuthService
             'role' => (string) $claims['role'],
             'location_id' => isset($claims['loc']) ? (int) $claims['loc'] : null,
             'account_id' => (int) ($claims['acc'] ?? 0),
+            'is_superadmin' => (bool) ($claims['sa'] ?? false),
         ];
     }
 
@@ -135,7 +137,7 @@ final class AuthService
      * Renueva la sesión: a partir de un token válido emite otro fresco (TTL
      * completo). El refresco respeta la revocación (verify ya la comprueba).
      *
-     * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int}}
+     * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int, is_superadmin: bool}}
      *
      * @throws AuthException
      */
@@ -233,7 +235,7 @@ final class AuthService
     }
 
     /**
-     * @param array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int} $ctx
+     * @param array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int, is_superadmin: bool} $ctx
      */
     private function issue(array $ctx, int $exp, int $tokenVersion): string
     {
@@ -245,6 +247,7 @@ final class AuthService
             'role' => $ctx['role'],
             'loc' => $ctx['location_id'],
             'acc' => $ctx['account_id'],
+            'sa' => $ctx['is_superadmin'],
             'tv' => $tokenVersion,
             'iat' => time(),
             'exp' => $exp,
