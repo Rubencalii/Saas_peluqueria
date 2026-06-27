@@ -169,6 +169,54 @@ export interface Account {
   } | null;
 }
 
+export interface ReportScope {
+  location_id: number | null;
+  from: string;
+  to: string;
+}
+
+export interface ReportRevenue {
+  total_revenue: number;
+  by_staff: Array<{ staff_id: number | null; staff_name: string | null; appointments: number; revenue: number }>;
+  by_service: Array<{ service_id: number; service_name: string; appointments: number; revenue: number }>;
+}
+
+export interface ReportChannel {
+  by_channel: { web: number; whatsapp: number; manual: number };
+  total: number;
+}
+
+export interface ReportNoShows {
+  no_shows: number;
+  completed: number;
+  no_show_rate: number | null;
+}
+
+export interface ReportRetention {
+  customers: number;
+  returning_customers: number;
+  retention_rate: number | null;
+}
+
+export interface ReportRatings {
+  count: number;
+  average: number;
+  by_staff: Array<{ staff_id: number | null; staff_name: string | null; count: number; average: number }>;
+  by_service: Array<{ service_id: number; service_name: string; count: number; average: number }>;
+}
+
+export interface ReportOccupancy {
+  booked_minutes: number;
+  capacity_minutes: number;
+  occupancy_rate: number | null;
+  by_staff: Array<{ staff_id: number | null; staff_name: string | null; booked_minutes: number; appointments: number }>;
+}
+
+export interface ReportPeak {
+  timezone: string;
+  slots: Array<{ weekday: number; hour: number; appointments: number }>;
+}
+
 export class AdminApiError extends Error {
   constructor(
     public readonly code: string,
@@ -190,6 +238,12 @@ export function setToken(token: string): void {
 
 export function clearToken(): void {
   window.localStorage.removeItem(TOKEN_KEY);
+}
+
+function reportQuery(s: ReportScope): string {
+  const q = new URLSearchParams({ from: s.from, to: s.to });
+  if (s.location_id) q.set("location_id", String(s.location_id));
+  return q.toString();
 }
 
 async function adminFetch<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
@@ -280,6 +334,14 @@ export const admin = {
       method: "POST",
       body: { location_id: locationId, entries },
     }),
+
+  reportRevenue: (s: ReportScope) => adminFetch<ReportRevenue>(`/api/v1/admin/reports/revenue?${reportQuery(s)}`),
+  reportChannel: (s: ReportScope) => adminFetch<ReportChannel>(`/api/v1/admin/reports/bookings-by-channel?${reportQuery(s)}`),
+  reportNoShows: (s: ReportScope) => adminFetch<ReportNoShows>(`/api/v1/admin/reports/no-shows?${reportQuery(s)}`),
+  reportRetention: (s: ReportScope) => adminFetch<ReportRetention>(`/api/v1/admin/reports/retention?${reportQuery(s)}`),
+  reportRatings: (s: ReportScope) => adminFetch<ReportRatings>(`/api/v1/admin/reports/ratings?${reportQuery(s)}`),
+  reportOccupancy: (s: ReportScope) => adminFetch<ReportOccupancy>(`/api/v1/admin/reports/occupancy?${reportQuery(s)}`),
+  reportPeak: (s: ReportScope) => adminFetch<ReportPeak>(`/api/v1/admin/reports/peak-hours?${reportQuery(s)}`),
 
   account: () => adminFetch<Account>("/api/v1/admin/account"),
 
