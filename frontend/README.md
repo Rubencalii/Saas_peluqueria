@@ -36,6 +36,11 @@ Las llamadas del navegador van a rutas relativas `/api/...` que Next **reescribe
 al backend (ver `next.config.ts`), así no hay CORS en desarrollo. Para apuntar a
 otro backend: `API_BASE=https://api.midominio.com npm run dev`.
 
+**Pago del depósito (opcional):** para que la web ofrezca pagar el depósito tras
+reservar (servicios con `deposit_amount`), define la clave pública de Stripe en
+`.env.local`: `NEXT_PUBLIC_STRIPE_PK=pk_test_...` (y en el backend `STRIPE_SECRET_KEY`
++ `STRIPE_WEBHOOK_SECRET`). Sin clave pública, el botón de pago no aparece.
+
 ## Scripts
 
 - `npm run dev` — desarrollo.

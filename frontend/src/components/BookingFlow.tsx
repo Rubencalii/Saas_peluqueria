@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { formatDateLong, formatPrice, formatTime, isoDate } from "@/lib/format";
+import { Deposit } from "@/components/Deposit";
 import type { AppointmentResult, Service, Slot } from "@/lib/types";
 
 type Step = "service" | "datetime" | "customer" | "done";
@@ -110,6 +111,13 @@ export function BookingFlow({
           <span className="font-mono text-base font-bold tracking-wider">{result.public_code}</span>
           <p className="mt-1 text-muted">Lo necesitarás para cambiarla o cancelarla en «Mi cita».</p>
         </div>
+
+        {service && service.deposit_amount !== null ? (
+          <div className="mx-auto max-w-sm">
+            <Deposit appointmentId={result.appointment_id} code={result.public_code} amount={service.deposit_amount} />
+          </div>
+        ) : null}
+
         <div className="mt-6 flex justify-center gap-2">
           <a href="/mi-cita" className="btn-ghost">Ver mi cita</a>
           <a href="/" className="btn-primary">Hecho</a>

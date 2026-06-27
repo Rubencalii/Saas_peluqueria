@@ -13,6 +13,7 @@ export interface Service {
   duration_min: number;
   buffer_min: number;
   price: number | null;
+  deposit_amount: number | null;
   description: string | null;
 }
 

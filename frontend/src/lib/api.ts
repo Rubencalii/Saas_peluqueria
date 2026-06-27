@@ -98,6 +98,12 @@ export const api = {
       return data as AppointmentResult;
     }),
 
+  deposit: (appointmentId: number, code: string) =>
+    request<{ client_secret: string; amount: number; currency: string; status: string }>(
+      `/api/v1/appointments/${appointmentId}/deposit`,
+      { method: "POST", body: { code } },
+    ),
+
   lookup: (phone: string, code: string) => {
     const q = new URLSearchParams({ phone, code });
     return request<LookupResult>(`/api/v1/appointments/lookup?${q.toString()}`, { revalidate: 0 });

@@ -51,7 +51,7 @@ final class CatalogController extends AbstractController
 
         $rows = $this->db->fetchAllAssociative(
             'SELECT s.id, s.name, s.duration_min, s.buffer_min,
-                    COALESCE(sl.price_override, s.price) AS price, s.description
+                    COALESCE(sl.price_override, s.price) AS price, s.description, s.deposit_amount
                FROM service s
                JOIN service_location sl ON sl.service_id = s.id AND sl.location_id = :loc
               WHERE s.active AND s.account_id = :acc
@@ -93,6 +93,7 @@ final class CatalogController extends AbstractController
             'duration_min' => (int) $r['duration_min'],
             'buffer_min' => (int) $r['buffer_min'],
             'price' => $r['price'] !== null ? (float) $r['price'] : null,
+            'deposit_amount' => $r['deposit_amount'] !== null ? (float) $r['deposit_amount'] : null,
             'description' => $r['description'],
         ];
     }
