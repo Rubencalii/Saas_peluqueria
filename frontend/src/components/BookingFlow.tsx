@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { formatDateLong, formatPrice, formatTime, isoDate } from "@/lib/format";
+import { buildIcs } from "@/lib/ics";
 import { Deposit } from "@/components/Deposit";
 import type { AppointmentResult, Service, Slot } from "@/lib/types";
 
@@ -11,10 +12,12 @@ type Step = "service" | "datetime" | "customer" | "done";
 
 export function BookingFlow({
   locationId,
+  locationName = "",
   timeZone,
   services,
 }: {
   locationId: number;
+  locationName?: string;
   timeZone: string;
   services: Service[];
 }) {
@@ -95,6 +98,23 @@ export function BookingFlow({
     }
   }
 
+  function addToCalendar() {
+    if (!result || !service) return;
+    const ics = buildIcs({
+      title: locationName ? `${service.name} · ${locationName}` : service.name,
+      start: result.start,
+      end: result.end,
+      location: locationName || undefined,
+      description: `Código de cita: ${result.public_code}`,
+    });
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "cita.ics";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (step === "done" && result) {
     return (
       <div className="card overflow-hidden p-8 text-center">
@@ -119,7 +139,8 @@ export function BookingFlow({
           </div>
         ) : null}
 
-        <div className="mt-6 flex justify-center gap-2">
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button type="button" onClick={addToCalendar} className="btn-ghost">📅 Añadir al calendario</button>
           <Link href="/mi-cita" className="btn-ghost">Ver mi cita</Link>
           <Link href="/" className="btn-primary">Hecho</Link>
         </div>

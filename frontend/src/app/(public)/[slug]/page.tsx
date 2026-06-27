@@ -66,7 +66,7 @@ export default async function LocationPage({
       {services.length === 0 ? (
         <ErrorNote title="Este salón aún no tiene servicios reservables online." />
       ) : (
-        <BookingFlow locationId={locationId} timeZone={timeZone} services={services} />
+        <BookingFlow locationId={locationId} locationName={locationName} timeZone={timeZone} services={services} />
       )}
     </div>
   );
