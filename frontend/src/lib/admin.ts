@@ -102,6 +102,35 @@ export interface CustomerDetail extends CustomerListItem {
   }>;
 }
 
+export interface ServiceLocationOffer {
+  location_id: number;
+  price_override: number | null;
+}
+
+export interface AdminService {
+  id: number;
+  name: string;
+  duration_min: number;
+  buffer_min: number;
+  price: number | null;
+  deposit_amount: number | null;
+  description: string | null;
+  active: boolean;
+  segments: Array<{ position: number; minutes: number; busy: boolean }>;
+  locations: ServiceLocationOffer[];
+}
+
+export interface ServiceInput {
+  name: string;
+  duration_min: number;
+  buffer_min: number;
+  price: number | null;
+  deposit_amount: number | null;
+  description: string | null;
+  active: boolean;
+  locations: Array<{ location_id: number; price_override: number | null }>;
+}
+
 export interface Account {
   account: { id: number; name: string; slug: string; status: string; created_at: string };
   subscription: {
@@ -189,6 +218,12 @@ export const admin = {
     ),
 
   customer: (id: number) => adminFetch<{ customer: CustomerDetail }>(`/api/v1/admin/customers/${id}`),
+
+  services: () => adminFetch<{ services: AdminService[] }>("/api/v1/admin/services"),
+  createService: (body: ServiceInput) =>
+    adminFetch<{ id: number }>("/api/v1/admin/services", { method: "POST", body }),
+  updateService: (id: number, body: Partial<ServiceInput>) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/services/${id}`, { method: "PATCH", body }),
 
   account: () => adminFetch<Account>("/api/v1/admin/account"),
 
