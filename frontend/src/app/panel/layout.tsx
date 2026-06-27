@@ -12,6 +12,7 @@ const NAV = [
   { href: "/panel/clientes", label: "Clientes", icon: "👥" },
   { href: "/panel/servicios", label: "Servicios", icon: "✂️" },
   { href: "/panel/personal", label: "Personal", icon: "🧑‍💼" },
+  { href: "/panel/bloqueos", label: "Bloqueos", icon: "🚫" },
   { href: "/panel/sedes", label: "Sedes", icon: "🏠" },
   { href: "/panel/whatsapp", label: "WhatsApp", icon: "💬" },
   { href: "/panel/espera", label: "Lista de espera", icon: "⏳" },

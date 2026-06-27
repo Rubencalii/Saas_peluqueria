@@ -159,6 +159,15 @@ export interface StaffInput {
   service_ids: number[];
 }
 
+export interface TimeBlock {
+  id: number;
+  staff: { id: number; name: string };
+  location_id: number | null;
+  start: string;
+  end: string;
+  reason: string | null;
+}
+
 export interface ScheduleEntry {
   id?: number;
   location_id: number;
@@ -393,6 +402,13 @@ export const admin = {
   createStaff: (body: StaffInput) => adminFetch<{ id: number }>("/api/v1/admin/staff", { method: "POST", body }),
   updateStaff: (id: number, body: Partial<StaffInput>) =>
     adminFetch<{ ok: boolean }>(`/api/v1/admin/staff/${id}`, { method: "PATCH", body }),
+  timeBlocks: (from: string, to: string) =>
+    adminFetch<{ time_blocks: TimeBlock[] }>(`/api/v1/admin/time-blocks?from=${from}&to=${to}`),
+  createTimeBlock: (body: { staff_id: number; location_id: number | null; start: string; end: string; reason: string | null }) =>
+    adminFetch<{ id: number }>("/api/v1/admin/time-blocks", { method: "POST", body }),
+  deleteTimeBlock: (id: number) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/time-blocks/${id}`, { method: "DELETE" }),
+
   staffSchedule: (id: number) =>
     adminFetch<{ schedule: ScheduleEntry[] }>(`/api/v1/admin/staff/${id}/schedule`),
   setStaffSchedule: (id: number, locationId: number, entries: Array<{ weekday: number; start_time: string; end_time: string }>) =>
