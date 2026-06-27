@@ -1,8 +1,24 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
 import { ErrorNote } from "@/components/ErrorNote";
 import { BookingFlow } from "@/components/BookingFlow";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  try {
+    const loc = (await api.locations()).find((l) => l.slug === slug);
+    if (loc) return { title: `${loc.name} · Reservar cita` };
+  } catch {
+    /* usa el título por defecto */
+  }
+  return { title: "Reservar cita" };
+}
 
 export default async function LocationPage({
   params,

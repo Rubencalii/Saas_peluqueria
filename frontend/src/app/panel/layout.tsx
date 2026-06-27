@@ -95,6 +95,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={
                   "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition " +
                   (active ? "bg-brand-soft text-foreground" : "text-muted hover:bg-brand-soft/60")

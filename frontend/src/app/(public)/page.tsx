@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { ErrorNote } from "@/components/ErrorNote";
 import type { Location } from "@/lib/types";
+
+export const metadata: Metadata = {
+  title: "Reserva tu cita",
+  description: "Elige tu salón y reserva tu cita online en menos de un minuto.",
+};
 
 export default async function Home() {
   let locations: Location[] = [];
