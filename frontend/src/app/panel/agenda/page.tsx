@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   admin,
+  AdminApiError,
   type Agenda,
   type AdminLocation,
+  type AdminService,
   type AgendaAppointment,
 } from "@/lib/admin";
 import { formatTime, isoDate } from "@/lib/format";
@@ -22,8 +24,10 @@ export default function AgendaPage() {
   const [locationId, setLocationId] = useState<number | null>(null);
   const [date, setDate] = useState(isoDate(new Date()));
   const [agenda, setAgenda] = useState<Agenda | null>(null);
+  const [services, setServices] = useState<AdminService[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     admin
@@ -33,6 +37,10 @@ export default function AgendaPage() {
         if (r.locations.length > 0) setLocationId(r.locations[0].id);
       })
       .catch(() => setError("No se pudieron cargar las sedes."));
+    admin
+      .services()
+      .then((r) => setServices(r.services))
+      .catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -65,20 +73,40 @@ export default function AgendaPage() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Agenda</h1>
-        {locations.length > 1 ? (
-          <select
-            value={locationId ?? ""}
-            onChange={(e) => setLocationId(Number(e.target.value))}
-            className="rounded-xl border border-border bg-card px-3 py-2 text-sm"
-          >
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {locations.length > 1 ? (
+            <select
+              value={locationId ?? ""}
+              onChange={(e) => setLocationId(Number(e.target.value))}
+              className="rounded-xl border border-border bg-card px-3 py-2 text-sm"
+            >
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <button onClick={() => setCreating(true)} disabled={!locationId} className="btn-primary px-4 py-2.5">
+            + Nueva cita
+          </button>
+        </div>
       </header>
+
+      {creating && locationId ? (
+        <NewAppointment
+          locationId={locationId}
+          date={date}
+          tz={tz}
+          services={services.filter((s) => s.active && s.locations.some((o) => o.location_id === locationId))}
+          onClose={() => setCreating(false)}
+          onCreated={async (d) => {
+            setCreating(false);
+            setDate(d);
+            await load();
+          }}
+        />
+      ) : null}
 
       <div className="flex items-center gap-2">
         <button onClick={() => shiftDay(-1)} className="btn-ghost px-3 py-2">←</button>
@@ -111,6 +139,144 @@ export default function AgendaPage() {
       ) : (
         <p className="card p-6 text-center text-sm text-muted">No hay citas este día. 🙌</p>
       )}
+    </div>
+  );
+}
+
+function NewAppointment({
+  locationId,
+  date: agendaDate,
+  tz,
+  services,
+  onClose,
+  onCreated,
+}: {
+  locationId: number;
+  date: string;
+  tz: string;
+  services: AdminService[];
+  onClose: () => void;
+  onCreated: (date: string) => void;
+}) {
+  const [serviceId, setServiceId] = useState<number | "">("");
+  const [date, setDate] = useState(agendaDate);
+  const [slots, setSlots] = useState<Array<{ start: string; staff_id: number }> | null>(null);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slot, setSlot] = useState<{ start: string; staff_id: number } | null>(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (serviceId === "") {
+      setSlots(null);
+      return;
+    }
+    setLoadingSlots(true);
+    setSlot(null);
+    admin
+      .availability(locationId, Number(serviceId), date)
+      .then((r) => setSlots(r.slots))
+      .catch(() => setSlots([]))
+      .finally(() => setLoadingSlots(false));
+  }, [serviceId, date, locationId]);
+
+  async function submit() {
+    if (serviceId === "" || !slot || name.trim() === "" || phone.trim() === "") {
+      setError("Completa servicio, hueco, nombre y teléfono.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await admin.createAppointment({
+        location_id: locationId,
+        service_id: Number(serviceId),
+        staff_id: slot.staff_id || null,
+        start: slot.start,
+        customer: { name: name.trim(), phone: phone.trim(), email: email.trim() || null },
+      });
+      onCreated(date);
+    } catch (e) {
+      if (e instanceof AdminApiError && e.code === "SLOT_TAKEN") {
+        setError("Ese hueco se acaba de ocupar. Elige otro.");
+        setSlot(null);
+        admin.availability(locationId, Number(serviceId), date).then((r) => setSlots(r.slots)).catch(() => {});
+      } else {
+        setError(e instanceof Error ? e.message : "No se pudo crear la cita.");
+      }
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="card space-y-4 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Nueva cita</h2>
+        <button onClick={onClose} className="text-muted hover:text-foreground">✕</button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm font-semibold">
+          Servicio
+          <select
+            value={serviceId}
+            onChange={(e) => setServiceId(e.target.value === "" ? "" : Number(e.target.value))}
+            className="field"
+          >
+            <option value="">Elige un servicio…</option>
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({s.duration_min} min)
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm font-semibold">
+          Día
+          <input type="date" value={date} min={isoDate(new Date())} onChange={(e) => setDate(e.target.value)} className="field" />
+        </label>
+      </div>
+
+      {serviceId !== "" ? (
+        <div>
+          <p className="mb-2 text-sm font-semibold">Hueco</p>
+          {loadingSlots ? (
+            <p className="text-sm text-muted">Buscando…</p>
+          ) : slots && slots.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {slots.map((s) => (
+                <button
+                  key={s.start}
+                  onClick={() => setSlot(s)}
+                  className={"slot " + (slot?.start === s.start ? "border-[var(--brand)] bg-brand-soft" : "")}
+                >
+                  {formatTime(s.start, tz)}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted">No quedan huecos ese día.</p>
+          )}
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del cliente" className="field" />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Teléfono" className="field" />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (opcional)" className="field" />
+      </div>
+
+      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} className="btn-ghost">Cancelar</button>
+        <button onClick={submit} disabled={saving || !slot} className="btn-primary px-5 py-2.5">
+          {saving ? "Creando…" : "Crear cita"}
+        </button>
+      </div>
     </div>
   );
 }

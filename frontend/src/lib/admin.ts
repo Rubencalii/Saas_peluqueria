@@ -233,6 +233,23 @@ export const admin = {
       `/api/v1/admin/agenda?location_id=${locationId}&date=${date}&view=${view}`,
     ),
 
+  availability: (locationId: number, serviceId: number, date: string) =>
+    adminFetch<{ date: string; slots: Array<{ start: string; staff_id: number }> }>(
+      `/api/v1/admin/availability?location_id=${locationId}&service_id=${serviceId}&date=${date}`,
+    ),
+
+  createAppointment: (body: {
+    location_id: number;
+    service_id: number;
+    staff_id: number | null;
+    start: string;
+    customer: { name: string; phone: string; email?: string | null };
+  }) =>
+    adminFetch<{ appointment_id: number }>("/api/v1/admin/appointments", {
+      method: "POST",
+      body: { ...body, channel: "manual" },
+    }),
+
   setAppointmentStatus: (id: number, status: string) =>
     adminFetch<unknown>(`/api/v1/admin/appointments/${id}`, { method: "PATCH", body: { status } }),
 
