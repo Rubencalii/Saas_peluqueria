@@ -167,6 +167,23 @@ export interface ScheduleEntry {
   end_time: string; // HH:MM
 }
 
+export interface Conversation {
+  wa_id: string;
+  phone: string;
+  customer_name: string | null;
+  state: string;
+  needs_human: boolean;
+  location: { id: number; name: string } | null;
+  updated_at: string;
+}
+
+export interface ConversationList {
+  conversations: Conversation[];
+  page: number;
+  per_page: number;
+  total: number;
+}
+
 export interface Account {
   account: { id: number; name: string; slug: string; status: string; created_at: string };
   subscription: {
@@ -355,6 +372,14 @@ export const admin = {
   reportRatings: (s: ReportScope) => adminFetch<ReportRatings>(`/api/v1/admin/reports/ratings?${reportQuery(s)}`),
   reportOccupancy: (s: ReportScope) => adminFetch<ReportOccupancy>(`/api/v1/admin/reports/occupancy?${reportQuery(s)}`),
   reportPeak: (s: ReportScope) => adminFetch<ReportPeak>(`/api/v1/admin/reports/peak-hours?${reportQuery(s)}`),
+
+  conversations: (status: "pendiente" | "all", page: number) =>
+    adminFetch<ConversationList>(`/api/v1/admin/conversations?status=${status}&page=${page}&per_page=20`),
+  replyConversation: (waId: string, message: string, resolve: boolean) =>
+    adminFetch<{ ok: boolean; resolved: boolean }>(`/api/v1/admin/conversations/${waId}/reply`, {
+      method: "POST",
+      body: { message, resolve },
+    }),
 
   account: () => adminFetch<Account>("/api/v1/admin/account"),
 
