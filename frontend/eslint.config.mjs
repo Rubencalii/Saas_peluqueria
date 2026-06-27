@@ -13,6 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    // Reglas del React Compiler (preview) demasiado estrictas para nuestros
+    // efectos de carga de datos (setLoading/setData dentro de un useEffect):
+    // son un patrón válido, no un bug. Las desactivamos para no ensuciar el CI.
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

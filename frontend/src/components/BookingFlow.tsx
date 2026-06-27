@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { formatDateLong, formatPrice, formatTime, isoDate } from "@/lib/format";
@@ -119,8 +120,8 @@ export function BookingFlow({
         ) : null}
 
         <div className="mt-6 flex justify-center gap-2">
-          <a href="/mi-cita" className="btn-ghost">Ver mi cita</a>
-          <a href="/" className="btn-primary">Hecho</a>
+          <Link href="/mi-cita" className="btn-ghost">Ver mi cita</Link>
+          <Link href="/" className="btn-primary">Hecho</Link>
         </div>
       </div>
     );
