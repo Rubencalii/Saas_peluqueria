@@ -88,7 +88,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           )}
           <span className="truncate font-semibold tracking-tight">{brandName(branding, "Panel")}</span>
         </div>
-        <nav className="flex gap-1 px-3 pb-3 md:flex-col">
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:overflow-visible">
           {NAV.map((item) => {
             const active = item.href === "/panel" ? pathname === "/panel" : pathname.startsWith(item.href);
             return (
@@ -97,7 +97,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={
-                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition " +
+                  "flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition " +
                   (active ? "bg-brand-soft text-foreground" : "text-muted hover:bg-brand-soft/60")
                 }
               >

@@ -387,6 +387,11 @@ export const admin = {
     ),
 
   customer: (id: number) => adminFetch<{ customer: CustomerDetail }>(`/api/v1/admin/customers/${id}`),
+  updateCustomer: (id: number, body: { name?: string; email?: string | null }) =>
+    adminFetch<{ customer: CustomerDetail }>(`/api/v1/admin/customers/${id}`, { method: "PATCH", body }),
+  exportCustomer: (id: number) => adminFetch<Record<string, unknown>>(`/api/v1/admin/customers/${id}/export`),
+  anonymizeCustomer: (id: number) =>
+    adminFetch<{ ok: boolean; anonymized: boolean }>(`/api/v1/admin/customers/${id}`, { method: "DELETE" }),
 
   services: () => adminFetch<{ services: AdminService[] }>("/api/v1/admin/services"),
   createService: (body: ServiceInput) =>

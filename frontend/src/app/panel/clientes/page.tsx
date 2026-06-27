@@ -11,6 +11,14 @@ export default function ClientesPage() {
   const [list, setList] = useState<CustomerList | null>(null);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
+  const [canGdpr, setCanGdpr] = useState(false);
+
+  useEffect(() => {
+    admin
+      .me()
+      .then((r) => setCanGdpr(r.user.role === "admin_sede" || r.user.role === "admin_cadena"))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -107,7 +115,15 @@ export default function ClientesPage() {
         </div>
 
         <div className="md:sticky md:top-5 md:self-start">
-          {selected ? <CustomerCard id={selected} onClose={() => setSelected(null)} /> : (
+          {selected ? (
+            <CustomerCard
+              id={selected}
+              canGdpr={canGdpr}
+              onClose={() => setSelected(null)}
+              onChanged={async () => { await load(); }}
+              onAnonymized={async () => { setSelected(null); await load(); }}
+            />
+          ) : (
             <p className="card grid h-40 place-items-center p-6 text-center text-sm text-muted">
               Selecciona un cliente para ver su ficha.
             </p>
@@ -118,18 +134,92 @@ export default function ClientesPage() {
   );
 }
 
-function CustomerCard({ id, onClose }: { id: number; onClose: () => void }) {
+function CustomerCard({
+  id,
+  canGdpr,
+  onClose,
+  onChanged,
+  onAnonymized,
+}: {
+  id: number;
+  canGdpr: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+  onAnonymized: () => void;
+}) {
   const [data, setData] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     setLoading(true);
     admin
       .customer(id)
-      .then((r) => setData(r.customer))
+      .then((r) => {
+        setData(r.customer);
+        setName(r.customer.name);
+        setEmail(r.customer.email ?? "");
+      })
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    setEditing(false);
+    setMsg(null);
+    reload();
+  }, [reload]);
+
+  async function saveEdit() {
+    if (name.trim() === "") return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await admin.updateCustomer(id, { name: name.trim(), email: email.trim() || null });
+      setEditing(false);
+      reload();
+      onChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "No se pudo guardar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function exportData() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const blob = await admin.exportCustomer(id);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(blob, null, 2)], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cliente-${id}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "No se pudo exportar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function anonymize() {
+    if (!confirm("Anonimizar borra los datos personales del cliente (se conservan las citas por ley). No se puede deshacer. ¿Continuar?")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await admin.anonymizeCustomer(id);
+      onAnonymized();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "No se pudo anonimizar.");
+      setBusy(false);
+    }
+  }
 
   if (loading) return <div className="card h-40 animate-pulse" />;
   if (!data) return <p className="card p-6 text-sm text-muted">No se pudo cargar la ficha.</p>;
@@ -137,11 +227,18 @@ function CustomerCard({ id, onClose }: { id: number; onClose: () => void }) {
   return (
     <div className="card p-5">
       <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">{data.name}</h2>
-          <p className="text-sm text-muted">{data.phone}</p>
-          {data.email ? <p className="text-sm text-muted">{data.email}</p> : null}
-        </div>
+        {editing ? (
+          <div className="flex-1 space-y-2 pr-3">
+            <input value={name} onChange={(e) => setName(e.target.value)} className="field mt-0" placeholder="Nombre" />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} className="field mt-0" placeholder="Email (opcional)" />
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-lg font-semibold">{data.name}</h2>
+            <p className="text-sm text-muted">{data.phone}</p>
+            {data.email ? <p className="text-sm text-muted">{data.email}</p> : null}
+          </div>
+        )}
         <button onClick={onClose} className="text-muted hover:text-foreground">✕</button>
       </div>
 
@@ -150,6 +247,25 @@ function CustomerCard({ id, onClose }: { id: number; onClose: () => void }) {
         <span className={"chip " + (data.wa_consent ? "bg-emerald-100 text-emerald-800" : "bg-zinc-200 text-zinc-600")}>
           WhatsApp {data.wa_consent ? "sí" : "no"}
         </span>
+      </div>
+
+      {msg ? <p className="mt-3 text-sm text-red-700">{msg}</p> : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {editing ? (
+          <>
+            <button onClick={saveEdit} disabled={busy} className="btn-primary px-3 py-1.5 text-xs">Guardar</button>
+            <button onClick={() => { setEditing(false); setName(data.name); setEmail(data.email ?? ""); }} className="btn-ghost px-3 py-1.5 text-xs">Cancelar</button>
+          </>
+        ) : (
+          <button onClick={() => setEditing(true)} className="btn-ghost px-3 py-1.5 text-xs">Editar</button>
+        )}
+        {canGdpr ? (
+          <>
+            <button onClick={exportData} disabled={busy} className="btn-ghost px-3 py-1.5 text-xs">Exportar datos</button>
+            <button onClick={anonymize} disabled={busy} className="btn-ghost px-3 py-1.5 text-xs text-red-700 hover:border-red-300">Anonimizar</button>
+          </>
+        ) : null}
       </div>
 
       <h3 className="mt-5 mb-2 text-sm font-semibold">Últimas citas</h3>
