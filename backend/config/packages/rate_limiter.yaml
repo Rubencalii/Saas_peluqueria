@@ -11,3 +11,17 @@ framework:
             policy: 'sliding_window'
             limit: 10
             interval: '1 minute'
+
+# En test no aplicamos rate limiting (varios tests funcionales hacen login en la
+# misma ventana y dispararían 429 sin probar nada del límite en sí).
+when@test:
+    framework:
+        rate_limiter:
+            public_api:
+                policy: 'sliding_window'
+                limit: 1000000
+                interval: '1 minute'
+            auth_login:
+                policy: 'sliding_window'
+                limit: 1000000
+                interval: '1 minute'
