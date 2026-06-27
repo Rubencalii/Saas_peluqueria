@@ -7,6 +7,7 @@ import { admin, clearToken, getToken, type PanelUser } from "@/lib/admin";
 import { brandName, brandVars, type Branding } from "@/lib/theme";
 
 const NAV = [
+  { href: "/panel", label: "Inicio", icon: "🏡" },
   { href: "/panel/agenda", label: "Agenda", icon: "📅" },
   { href: "/panel/clientes", label: "Clientes", icon: "👥" },
   { href: "/panel/servicios", label: "Servicios", icon: "✂️" },
@@ -88,7 +89,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
         </div>
         <nav className="flex gap-1 px-3 pb-3 md:flex-col">
           {NAV.map((item) => {
-            const active = pathname.startsWith(item.href);
+            const active = item.href === "/panel" ? pathname === "/panel" : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
