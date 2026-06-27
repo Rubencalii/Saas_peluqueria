@@ -184,6 +184,42 @@ export interface ConversationList {
   total: number;
 }
 
+export interface WaitlistItem {
+  id: number;
+  status: string;
+  desired_date: string | null;
+  created_at: string;
+  notified_at: string | null;
+  location: { id: number; name: string };
+  service: { id: number; name: string };
+  staff: { id: number; name: string } | null;
+  customer: { name: string; phone: string };
+}
+
+export interface WaitlistList {
+  waitlist: WaitlistItem[];
+  page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface Review {
+  id: number;
+  rating: number;
+  comment: string | null;
+  service_name: string;
+  staff_name: string | null;
+  customer_name: string | null;
+  created_at: string;
+}
+
+export interface ReviewList {
+  reviews: Review[];
+  page: number;
+  per_page: number;
+  total: number;
+}
+
 export interface Account {
   account: { id: number; name: string; slug: string; status: string; created_at: string };
   subscription: {
@@ -380,6 +416,19 @@ export const admin = {
       method: "POST",
       body: { message, resolve },
     }),
+
+  waitlist: (locationId: number | null, status: string, page: number) => {
+    const q = new URLSearchParams({ status, page: String(page), per_page: "20" });
+    if (locationId) q.set("location_id", String(locationId));
+    return adminFetch<WaitlistList>(`/api/v1/admin/waitlist?${q.toString()}`);
+  },
+  cancelWaitlist: (id: number) => adminFetch<{ ok: boolean }>(`/api/v1/admin/waitlist/${id}`, { method: "DELETE" }),
+
+  reviews: (locationId: number | null, page: number) => {
+    const q = new URLSearchParams({ page: String(page), per_page: "20" });
+    if (locationId) q.set("location_id", String(locationId));
+    return adminFetch<ReviewList>(`/api/v1/admin/reviews?${q.toString()}`);
+  },
 
   account: () => adminFetch<Account>("/api/v1/admin/account"),
 
