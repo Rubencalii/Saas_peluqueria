@@ -48,6 +48,15 @@ export interface AdminLocation {
   active: boolean;
 }
 
+export interface LocationInput {
+  name: string;
+  slug: string;
+  address: string | null;
+  phone: string | null;
+  timezone: string;
+  active: boolean;
+}
+
 export interface AgendaAppointment {
   appointment_id: number;
   status: string;
@@ -322,6 +331,10 @@ export const admin = {
     adminFetch<{ id: number }>("/api/v1/admin/services", { method: "POST", body }),
   updateService: (id: number, body: Partial<ServiceInput>) =>
     adminFetch<{ ok: boolean }>(`/api/v1/admin/services/${id}`, { method: "PATCH", body }),
+
+  createLocation: (body: LocationInput) => adminFetch<{ id: number }>("/api/v1/admin/locations", { method: "POST", body }),
+  updateLocation: (id: number, body: Partial<LocationInput>) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/locations/${id}`, { method: "PATCH", body }),
 
   staff: () => adminFetch<{ staff: AdminStaff[] }>("/api/v1/admin/staff"),
   createStaff: (body: StaffInput) => adminFetch<{ id: number }>("/api/v1/admin/staff", { method: "POST", body }),
