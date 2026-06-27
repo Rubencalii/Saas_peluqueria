@@ -10,6 +10,7 @@ const NAV = [
   { href: "/panel/agenda", label: "Agenda", icon: "📅" },
   { href: "/panel/clientes", label: "Clientes", icon: "👥" },
   { href: "/panel/servicios", label: "Servicios", icon: "✂️" },
+  { href: "/panel/personal", label: "Personal", icon: "🧑‍💼" },
   { href: "/panel/cuenta", label: "Cuenta", icon: "💳" },
   { href: "/panel/apariencia", label: "Apariencia", icon: "🎨" },
 ];

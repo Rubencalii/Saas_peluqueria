@@ -131,6 +131,33 @@ export interface ServiceInput {
   locations: Array<{ location_id: number; price_override: number | null }>;
 }
 
+export interface AdminStaff {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  active: boolean;
+  location_ids: number[];
+  service_ids: number[];
+}
+
+export interface StaffInput {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  active: boolean;
+  location_ids: number[];
+  service_ids: number[];
+}
+
+export interface ScheduleEntry {
+  id?: number;
+  location_id: number;
+  weekday: number; // 0 = lunes … 6 = domingo
+  start_time: string; // HH:MM
+  end_time: string; // HH:MM
+}
+
 export interface Account {
   account: { id: number; name: string; slug: string; status: string; created_at: string };
   subscription: {
@@ -224,6 +251,18 @@ export const admin = {
     adminFetch<{ id: number }>("/api/v1/admin/services", { method: "POST", body }),
   updateService: (id: number, body: Partial<ServiceInput>) =>
     adminFetch<{ ok: boolean }>(`/api/v1/admin/services/${id}`, { method: "PATCH", body }),
+
+  staff: () => adminFetch<{ staff: AdminStaff[] }>("/api/v1/admin/staff"),
+  createStaff: (body: StaffInput) => adminFetch<{ id: number }>("/api/v1/admin/staff", { method: "POST", body }),
+  updateStaff: (id: number, body: Partial<StaffInput>) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/staff/${id}`, { method: "PATCH", body }),
+  staffSchedule: (id: number) =>
+    adminFetch<{ schedule: ScheduleEntry[] }>(`/api/v1/admin/staff/${id}/schedule`),
+  setStaffSchedule: (id: number, locationId: number, entries: Array<{ weekday: number; start_time: string; end_time: string }>) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/staff/${id}/schedule`, {
+      method: "POST",
+      body: { location_id: locationId, entries },
+    }),
 
   account: () => adminFetch<Account>("/api/v1/admin/account"),
 
