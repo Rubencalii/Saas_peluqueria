@@ -64,6 +64,26 @@ final class PublicTenantResolutionTest extends WebTestCase
         self::assertSame([$foreignLocId], $ids);
     }
 
+    public function testPersonalPublicoPorSedeYServicio(): void
+    {
+        // Sede 1 (centro) + servicio 2 (Corte hombre) del seed → lista de personal.
+        $res = $this->getJson('/api/v1/staff?location_id=1&service_id=2', 'localhost');
+        self::assertIsArray($res['staff']);
+        self::assertNotEmpty($res['staff'], 'El seed debe tener personal para ese servicio/sede.');
+        self::assertArrayHasKey('name', $res['staff'][0]);
+
+        // Una sede de otra cuenta no expone personal (lista vacía).
+        $other = (int) $this->db->fetchOne(
+            "INSERT INTO account (name, slug, status) VALUES ('X', 'x-acc', 'active') RETURNING id"
+        );
+        $loc = (int) $this->db->fetchOne(
+            "INSERT INTO location (account_id, name, slug, timezone, active) VALUES (?, 'X', 'x-loc', 'Europe/Madrid', TRUE) RETURNING id",
+            [$other]
+        );
+        $res2 = $this->getJson("/api/v1/staff?location_id={$loc}&service_id=2", 'localhost');
+        self::assertSame([], $res2['staff']);
+    }
+
     /**
      * @return array<mixed>
      */

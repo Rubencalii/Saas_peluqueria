@@ -13,7 +13,7 @@ vi.mock("@/lib/api", () => {
   }
   return {
     ApiError,
-    api: { availability: vi.fn(), createAppointment: vi.fn() },
+    api: { availability: vi.fn(), createAppointment: vi.fn(), staff: vi.fn() },
   };
 });
 
@@ -29,6 +29,7 @@ const services: Service[] = [
 describe("BookingFlow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocked.staff.mockResolvedValue({ staff: [] });
     mocked.availability.mockResolvedValue({
       date: "2026-07-15",
       slots: [{ start: "2026-07-15T08:30:00.000Z", staff_id: 3 }], // 10:30 en Madrid

@@ -66,6 +66,40 @@ final class CatalogController extends AbstractController
     }
 
     /**
+     * Profesionales que ofrecen un servicio en una sede (para que el cliente
+     * pueda elegir con quién). Acotado a la cuenta del subdominio.
+     */
+    #[Route('/api/v1/staff', name: 'public_staff', methods: ['GET'])]
+    public function staff(Request $request): JsonResponse
+    {
+        $locationId = (int) $request->query->get('location_id', 0);
+        $serviceId = (int) $request->query->get('service_id', 0);
+        if ($locationId <= 0 || $serviceId <= 0) {
+            return $this->json(['error' => ['code' => 'VALIDATION', 'message' => 'location_id y service_id son obligatorios.']], 400);
+        }
+        if (!$this->tenant->locationInAccount($request, $locationId)) {
+            return $this->json(['staff' => []]);
+        }
+
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT s.id, s.name
+               FROM staff s
+               JOIN staff_service  ss ON ss.staff_id = s.id AND ss.service_id = ?
+               JOIN staff_location sl ON sl.staff_id = s.id AND sl.location_id = ?
+              WHERE s.active AND s.account_id = ?
+              ORDER BY s.name',
+            [$serviceId, $locationId, $this->tenant->accountId($request)]
+        );
+
+        return $this->json([
+            'staff' => array_map(static fn (array $r): array => [
+                'id' => (int) $r['id'],
+                'name' => (string) $r['name'],
+            ], $rows),
+        ]);
+    }
+
+    /**
      * @param array<string, mixed> $r
      *
      * @return array<string, mixed>

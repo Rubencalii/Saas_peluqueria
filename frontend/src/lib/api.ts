@@ -72,6 +72,12 @@ export const api = {
       revalidate: 0,
     }),
 
+  staff: (locationId: number, serviceId: number) =>
+    request<{ staff: Array<{ id: number; name: string }> }>(
+      `/api/v1/staff?location_id=${locationId}&service_id=${serviceId}`,
+      { revalidate: 60 },
+    ),
+
   availability: (params: { location_id: number; service_id: number; date: string; staff_id?: number | null }) => {
     const q = new URLSearchParams({
       location_id: String(params.location_id),

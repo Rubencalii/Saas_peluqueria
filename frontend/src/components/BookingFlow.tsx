@@ -27,6 +27,8 @@ export function BookingFlow({
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slot, setSlot] = useState<Slot | null>(null);
+  const [staffOptions, setStaffOptions] = useState<Array<{ id: number; name: string }>>([]);
+  const [staffId, setStaffId] = useState<number | null>(null);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -42,22 +44,29 @@ export function BookingFlow({
     setSlots(null);
     setSlot(null);
     try {
-      const av = await api.availability({ location_id: locationId, service_id: service.id, date });
+      const av = await api.availability({ location_id: locationId, service_id: service.id, date, staff_id: staffId });
       setSlots(av.slots);
     } catch {
       setSlots([]);
     } finally {
       setLoadingSlots(false);
     }
-  }, [service, locationId, date]);
+  }, [service, locationId, date, staffId]);
 
   useEffect(() => {
     if (step === "datetime" && service) void loadSlots();
-  }, [step, service, date, loadSlots]);
+  }, [step, service, date, staffId, loadSlots]);
 
   function chooseService(s: Service) {
     setService(s);
+    setStaffId(null);
+    setStaffOptions([]);
     setStep("datetime");
+    // Carga el personal que ofrece este servicio en la sede (para elegir con quién).
+    api
+      .staff(locationId, s.id)
+      .then((r) => setStaffOptions(r.staff))
+      .catch(() => setStaffOptions([]));
   }
 
   function chooseSlot(s: Slot) {
@@ -189,6 +198,20 @@ export function BookingFlow({
         <div className="space-y-5">
           <SelectedBadge label={service.name} onChange={() => setStep("service")} />
 
+          {staffOptions.length > 1 ? (
+            <div className="text-sm font-semibold">
+              ¿Con quién?
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                <StaffChip on={staffId === null} onClick={() => setStaffId(null)}>Sin preferencia</StaffChip>
+                {staffOptions.map((p) => (
+                  <StaffChip key={p.id} on={staffId === p.id} onClick={() => setStaffId(p.id)}>
+                    {p.name}
+                  </StaffChip>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <label className="block text-sm font-semibold">
             Elige el día
             <input
@@ -311,6 +334,21 @@ function Steps({ current }: { current: Step }) {
         );
       })}
     </ol>
+  );
+}
+
+function StaffChip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "rounded-full border px-3 py-1.5 text-sm font-medium transition " +
+        (on ? "border-[var(--brand)] bg-brand-soft" : "border-border bg-card text-muted hover:border-[var(--ring)]")
+      }
+    >
+      {children}
+    </button>
   );
 }
 
