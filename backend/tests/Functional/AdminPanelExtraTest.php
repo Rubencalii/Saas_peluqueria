@@ -84,6 +84,15 @@ final class AdminPanelExtraTest extends WebTestCase
         self::assertStringNotContainsString('600555444', $phone);
     }
 
+    public function testCortaElPanelConSecretoInseguroEnHostNoLocal(): void
+    {
+        // En test el APP_SECRET es un placeholder inseguro: desde un host NO local
+        // el panel debe cortar con 500 (defensa ante despliegue mal configurado).
+        $this->client->request('GET', '/api/v1/admin/me', server: ['HTTP_HOST' => 'panel.example.com']);
+        self::assertSame(500, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('INSECURE_CONFIG', (string) $this->client->getResponse()->getContent());
+    }
+
     private function login(): string
     {
         $this->client->request(

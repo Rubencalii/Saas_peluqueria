@@ -46,6 +46,15 @@ final class AdminAuthListener
             return;
         }
 
+        // Despliegue mal configurado (p. ej. APP_ENV=dev en un servidor real) con
+        // un APP_SECRET inseguro: se corta el acceso al panel desde hosts NO
+        // locales, porque ese secreto permitiría forjar tokens de super-admin.
+        if ($this->auth->secretIsInsecure() && !$this->isLocalHost($request->getHost())) {
+            $event->setResponse($this->deny('INSECURE_CONFIG', 'Configuración insegura: APP_SECRET por defecto. Define un secreto real.', 500));
+
+            return;
+        }
+
         $header = (string) $request->headers->get('Authorization', '');
         if (!str_starts_with($header, 'Bearer ')) {
             $event->setResponse($this->deny('UNAUTHORIZED', 'Falta el token de acceso.', 401));
@@ -74,6 +83,11 @@ final class AdminAuthListener
         }
 
         $request->attributes->set(self::ATTR, $user);
+    }
+
+    private function isLocalHost(string $host): bool
+    {
+        return in_array($host, ['localhost', '127.0.0.1', '::1', ''], true) || str_ends_with($host, '.localhost');
     }
 
     private function accountSuspended(int $accountId): bool
