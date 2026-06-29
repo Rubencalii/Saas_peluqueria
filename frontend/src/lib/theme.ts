@@ -54,9 +54,10 @@ export function brandVars(branding: Branding | null | undefined): CSSProperties 
   if (brand) {
     vars["--brand"] = toHex(brand);
     vars["--brand-strong"] = toHex(mix(brand, BLACK, 0.16));
-    vars["--brand-soft"] = toHex(mix(brand, WHITE, 0.86));
     vars["--brand-ink"] = inkOn(brand);
     vars["--ring"] = toHex(mix(brand, WHITE, 0.4));
+    // --brand-soft NO se fija aquí: se deriva en CSS con color-mix(marca, fondo)
+    // para que se adapte al color de marca Y al tema (claro/oscuro).
   }
 
   const accent = branding.accent_color ? parseHex(branding.accent_color) : null;

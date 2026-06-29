@@ -16,10 +16,10 @@ describe("brandVars", () => {
     expect(v["--brand"]).toBe("#000000");
     // sobre negro, el texto de marca es claro
     expect(v["--brand-ink"]).toBe("#fffaf5");
-    // tono suave = mezcla con blanco al 86% (219 = 0xdb)
-    expect(v["--brand-soft"]).toBe("#dbdbdb");
     // hover = mezcla con negro (negro sigue negro)
     expect(v["--brand-strong"]).toBe("#000000");
+    // --brand-soft lo deriva el CSS (color-mix), no brandVars
+    expect(v["--brand-soft"]).toBeUndefined();
   });
 
   it("elige texto oscuro sobre marcas claras", () => {

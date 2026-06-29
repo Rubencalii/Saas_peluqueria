@@ -8,7 +8,6 @@
   --brand: #a96f43; /* cobre/terracota */
   --brand-strong: #8c5a33; /* hover */
   --brand-ink: #fffaf5; /* texto sobre --brand */
-  --brand-soft: #f4e9df; /* fondo suave de marca */
   --accent: #2f7d6b; /* verde salvia para éxito/acentos */
 
   --background: #fbf8f4;
@@ -18,9 +17,38 @@
   --border: #ece3d8;
   --ring: #d8a878;
 
+  /* Tono suave de marca: se deriva del color de marca y del fondo, así se
+     adapta tanto a la marca de cada salón como al tema claro/oscuro. */
+  --brand-soft: color-mix(in srgb, var(--brand) 13%, var(--background));
+
   --radius: 1rem;
   --shadow-soft: 0 1px 2px rgba(36, 29, 23, 0.04), 0 8px 24px -12px rgba(36, 29, 23, 0.12);
   --shadow-lift: 0 2px 4px rgba(36, 29, 23, 0.05), 0 18px 40px -18px rgba(36, 29, 23, 0.22);
+}
+
+/* Modo oscuro: solo cambian los neutros (fondo/texto/tarjeta/borde); la marca y
+   el acento se mantienen, y --brand-soft se recalcula sobre el fondo oscuro. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: #17120e;
+    --foreground: #f1ebe4;
+    --muted: #a99e92;
+    --card: #221a14;
+    --border: #382e26;
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.35), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #17120e;
+  --foreground: #f1ebe4;
+  --muted: #a99e92;
+  --card: #221a14;
+  --border: #382e26;
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.35), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
 }
 
 @theme inline {

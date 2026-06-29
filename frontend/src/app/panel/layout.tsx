@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { admin, clearToken, getToken, type PanelUser } from "@/lib/admin";
 import { brandName, brandVars, type Branding } from "@/lib/theme";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/panel", label: "Inicio", icon: "🏡" },
@@ -55,6 +56,17 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
       .catch(() => {});
   }, [isLogin, pathname, router]);
 
+  // Aplica la marca de la cuenta en :root (no en un contenedor) para que el tono
+  // suave de marca (color-mix) y el modo oscuro se compongan correctamente.
+  useEffect(() => {
+    const vars = brandVars(branding) as Record<string, string>;
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+    return () => {
+      for (const k of Object.keys(vars)) root.style.removeProperty(k);
+    };
+  }, [branding]);
+
   if (isLogin) return <>{children}</>;
 
   if (!ready) {
@@ -72,7 +84,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row" style={brandVars(branding)}>
+    <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="border-b border-border bg-card md:w-60 md:shrink-0 md:border-b-0 md:border-r">
         <div className="flex items-center gap-2 px-5 py-4">
           {branding?.logo_url ? (
@@ -119,6 +131,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
             ) : null}
           </span>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             {user?.is_superadmin ? (
               <Link
                 href="/superadmin"

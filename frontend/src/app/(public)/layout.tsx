@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { brandCss, brandName, type Branding } from "@/lib/theme";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Cada host (subdominio) es una cuenta distinta: render por petición, no estático.
 export const dynamic = "force-dynamic";
@@ -37,12 +38,15 @@ export default async function PublicLayout({
             )}
             <span className="text-[15px]">{name}</span>
           </Link>
-          <Link
-            href="/mi-cita"
-            className="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted transition hover:bg-brand-soft hover:text-foreground"
-          >
-            Mi cita
-          </Link>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Link
+              href="/mi-cita"
+              className="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted transition hover:bg-brand-soft hover:text-foreground"
+            >
+              Mi cita
+            </Link>
+          </div>
         </div>
       </header>
 
