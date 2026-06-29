@@ -13,6 +13,7 @@ export interface PanelUser {
   location_id: number | null;
   account_id: number;
   is_superadmin: boolean;
+  email_verified?: boolean;
 }
 
 export interface SaAccount {
@@ -350,6 +351,9 @@ export const admin = {
   me: () => adminFetch<{ user: PanelUser }>("/api/v1/admin/me"),
 
   logout: () => adminFetch<{ ok: boolean }>("/api/v1/admin/auth/logout", { method: "POST" }),
+
+  verifyEmail: (token: string) => adminFetch<{ ok: boolean }>("/api/v1/auth/verify-email", { method: "POST", body: { token } }),
+  resendVerification: () => adminFetch<{ ok: boolean }>("/api/v1/admin/auth/resend-verification", { method: "POST" }),
 
   locations: () => adminFetch<{ locations: AdminLocation[] }>("/api/v1/admin/locations"),
 

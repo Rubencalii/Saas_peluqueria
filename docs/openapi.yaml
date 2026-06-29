@@ -252,6 +252,26 @@ paths:
         "200": { description: OK }
         "401": { $ref: "#/components/responses/Error" }
 
+  /api/v1/auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Verifica el email del alta con el token del enlace
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } }
+      responses:
+        "200": { description: Verificado }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /api/v1/admin/auth/resend-verification:
+    post:
+      tags: [Auth]
+      summary: Reenvía el email de verificación al usuario autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Error" }
+
   /api/v1/auth/password/forgot:
     post:
       tags: [Auth]

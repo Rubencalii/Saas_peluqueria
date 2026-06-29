@@ -24,6 +24,7 @@ final class SignupService
         private readonly Connection $db,
         private readonly AuthService $auth,
         private readonly EmailSender $email,
+        private readonly EmailVerificationService $emailVerification,
     ) {
     }
 
@@ -110,6 +111,10 @@ final class SignupService
             'Tu salón está listo en ' . $businessName,
             "¡Hola {$adminName}!\n\nHemos creado tu cuenta. Ya puedes entrar al panel con este email.\n\nUn saludo."
         );
+
+        // Email de verificación (prueba de propiedad del email).
+        $userId = (int) $this->db->fetchOne('SELECT id FROM app_user WHERE email = ?', [$adminEmail]);
+        $this->emailVerification->issueFor($userId, $adminEmail, $adminName);
 
         $session = $this->auth->login($adminEmail, $password);
 

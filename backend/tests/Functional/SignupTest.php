@@ -78,6 +78,27 @@ final class SignupTest extends WebTestCase
         // El email es único global: repetir el alta da 409.
         $this->post('/api/v1/signup', ['business_name' => 'Otro', 'slug' => 'otro-salon', 'admin' => $body['admin'], 'location' => ['name' => 'X']]);
         self::assertSame(409, $this->client->getResponse()->getStatusCode());
+
+        // El email arranca SIN verificar; el enlace lo marca como verificado.
+        $this->client->request('GET', '/api/v1/admin/me', server: ['HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
+        $me = json_decode((string) $this->client->getResponse()->getContent(), true)['user'];
+        self::assertFalse($me['email_verified']);
+
+        $userId = (int) $this->db->fetchOne("SELECT id FROM app_user WHERE email = 'dueno@misalon.es'");
+        /** @var \App\Service\Tenant\EmailVerificationService $verif */
+        $verif = static::getContainer()->get(\App\Service\Tenant\EmailVerificationService::class);
+        $verifyToken = $verif->issueFor($userId, 'dueno@misalon.es', 'Dueño');
+
+        // Token inválido → 400.
+        $this->post('/api/v1/auth/verify-email', ['token' => 'no-vale']);
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+
+        // Token válido → verificado.
+        $this->post('/api/v1/auth/verify-email', ['token' => $verifyToken]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $this->client->request('GET', '/api/v1/admin/me', server: ['HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
+        $me2 = json_decode((string) $this->client->getResponse()->getContent(), true)['user'];
+        self::assertTrue($me2['email_verified']);
     }
 
     /**

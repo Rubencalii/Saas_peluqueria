@@ -147,9 +147,42 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
         </header>
 
         <main className="flex-1 p-5 md:p-8">
-          <div className="mx-auto max-w-4xl">{children}</div>
+          <div className="mx-auto max-w-4xl space-y-5">
+            {user && user.email_verified === false ? <VerifyBanner /> : null}
+            {children}
+          </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+function VerifyBanner() {
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function resend() {
+    setBusy(true);
+    try {
+      await admin.resendVerification();
+      setSent(true);
+    } catch {
+      /* ignore */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <span>📧 Verifica tu email para confirmar tu cuenta. Te enviamos un enlace al registrarte.</span>
+      {sent ? (
+        <span className="font-medium">Enlace reenviado ✓</span>
+      ) : (
+        <button onClick={resend} disabled={busy} className="rounded-full border border-amber-400 px-3 py-1.5 font-medium hover:bg-amber-100 disabled:opacity-50">
+          {busy ? "Enviando…" : "Reenviar"}
+        </button>
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ final class AuthController extends AbstractController
     public function __construct(
         private readonly AuthService $auth,
         private readonly PasswordResetService $passwordReset,
+        private readonly \App\Service\Tenant\EmailVerificationService $emailVerification,
     ) {
     }
 
@@ -123,6 +124,39 @@ final class AuthController extends AbstractController
     #[Route('/api/v1/admin/me', name: 'auth_me', methods: ['GET'])]
     public function me(Request $request): JsonResponse
     {
-        return $this->json(['user' => AdminController::user($request)]);
+        $user = AdminController::user($request);
+        $user['email_verified'] = $this->emailVerification->isVerified($user['id']);
+
+        return $this->json(['user' => $user]);
+    }
+
+    /**
+     * Verifica el email a partir del token del enlace (público).
+     */
+    #[Route('/api/v1/auth/verify-email', name: 'auth_verify_email', methods: ['POST'])]
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true);
+        $token = is_array($payload) && is_string($payload['token'] ?? null) ? $payload['token'] : '';
+
+        if (!$this->emailVerification->verify($token)) {
+            return $this->json(['error' => ['code' => 'INVALID_TOKEN', 'message' => 'El enlace no es válido o ha caducado.']], 400);
+        }
+
+        return $this->json(['ok' => true]);
+    }
+
+    /**
+     * Reenvía el email de verificación al usuario autenticado.
+     */
+    #[Route('/api/v1/admin/auth/resend-verification', name: 'auth_resend_verification', methods: ['POST'])]
+    public function resendVerification(Request $request): JsonResponse
+    {
+        $user = AdminController::user($request);
+        if (!$this->emailVerification->isVerified($user['id'])) {
+            $this->emailVerification->issueFor($user['id'], $user['email'], $user['name']);
+        }
+
+        return $this->json(['ok' => true]);
     }
 }

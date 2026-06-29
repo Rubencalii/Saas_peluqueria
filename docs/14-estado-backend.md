@@ -90,6 +90,7 @@ php bin/phpunit
 | `0019_account_locale.sql` | Idioma de los mensajes por cuenta (`account.locale`) |
 | `0020_account_branding.sql` | Marca white-label por cuenta (`display_name`, `brand_color`, `accent_color`, `logo_url`) |
 | `0021_superadmin.sql` | Super-admin de plataforma (`app_user.is_superadmin` + usuario de plataforma) |
+| `0022_email_verification.sql` | Verificación de email del alta (`app_user.email_verified_at` + token) |
 
 Las migraciones se aplican con el runner versionado `app:db:migrate` (registra en `schema_migration`; opciones `--status`, `--baseline`).
 
