@@ -13,6 +13,7 @@ import {
   type ReportNoShows,
 } from "@/lib/admin";
 import { formatPrice } from "@/lib/format";
+import { downloadCsv, toCsv } from "@/lib/csv";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -81,9 +82,29 @@ export default function InformesPage() {
     void load();
   }, [load]);
 
+  function exportCsv() {
+    const rows: Array<Array<string | number | null>> = [];
+    rows.push(["Periodo", `${from} a ${to}`]);
+    rows.push(["Ingresos", revenue ? revenue.total_revenue : ""]);
+    rows.push(["Tasa no-show", noShows && noShows.no_show_rate !== null ? noShows.no_show_rate : ""]);
+    rows.push(["Retención", retention && retention.retention_rate !== null ? retention.retention_rate : ""]);
+    rows.push(["Valoración media", ratings && ratings.count > 0 ? ratings.average : ""]);
+    rows.push([]);
+    rows.push(["Ingresos por servicio", "Citas", "€"]);
+    for (const r of revenue?.by_service ?? []) rows.push([r.service_name, r.appointments, r.revenue]);
+    rows.push([]);
+    rows.push(["Ingresos por profesional", "Citas", "€"]);
+    for (const r of revenue?.by_staff ?? []) rows.push([r.staff_name ?? "Sin asignar", r.appointments, r.revenue]);
+
+    downloadCsv(`informe_${from}_${to}.csv`, toCsv(["Concepto", "Valor", ""], rows));
+  }
+
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold tracking-tight">Informes</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Informes</h1>
+        <button onClick={exportCsv} disabled={loading} className="btn-ghost">⬇ Exportar CSV</button>
+      </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm font-semibold">
