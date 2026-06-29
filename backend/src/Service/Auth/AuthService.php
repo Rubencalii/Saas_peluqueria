@@ -30,7 +30,20 @@ final class AuthService
     public function __construct(
         private readonly Connection $db,
         private readonly string $secret,
+        bool $debug = true,
     ) {
+        // Defensa anti-forja: en producción (sin debug) no se arranca con un
+        // APP_SECRET vacío, corto o un placeholder conocido del repositorio. Sin
+        // esto, quien conozca el secreto podría firmar tokens (incluido super-admin).
+        if (!$debug) {
+            $insecure = mb_strlen($secret) < 32
+                || preg_match('/(placeholder|insecure|change.?me|example|secret|test)/i', $secret) === 1;
+            if ($insecure) {
+                throw new \RuntimeException(
+                    'APP_SECRET inseguro o por defecto en producción. Configura un secreto único y aleatorio de ≥32 caracteres (variable de entorno o gestor de secretos).'
+                );
+            }
+        }
     }
 
     /**

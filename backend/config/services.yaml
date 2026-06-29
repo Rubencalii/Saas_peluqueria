@@ -31,6 +31,7 @@ services:
             $from: '%env(MAILER_FROM)%'
             $publicApiLimiter: '@limiter.public_api'
             $authLimiter: '@limiter.auth_login'
+            $signupLimiter: '@limiter.signup'
             $debug: '%kernel.debug%'
             $projectDir: '%kernel.project_dir%'
 

@@ -28,6 +28,7 @@ final class WhatsAppWebhookController extends AbstractController
         private readonly Connection $db,
         private readonly string $verifyToken,
         private readonly string $appSecret,
+        private readonly bool $debug = true,
     ) {
     }
 
@@ -146,7 +147,10 @@ final class WhatsAppWebhookController extends AbstractController
     private function signatureValid(Request $request, string $body): bool
     {
         if ($this->appSecret === '') {
-            return true; // modo local: sin secreto no se valida
+            // Sin secreto: solo se acepta sin firma en desarrollo. En producción
+            // se rechaza (fail-closed): un webhook sin firma permitiría inyectar
+            // mensajes suplantando a cualquier cliente.
+            return $this->debug;
         }
 
         $header = (string) $request->headers->get('X-Hub-Signature-256', '');

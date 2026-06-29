@@ -36,6 +36,7 @@ final class PublicRateLimitListener
     public function __construct(
         private readonly RateLimiterFactoryInterface $publicApiLimiter,
         private readonly RateLimiterFactoryInterface $authLimiter,
+        private readonly RateLimiterFactoryInterface $signupLimiter,
     ) {
     }
 
@@ -49,6 +50,13 @@ final class PublicRateLimitListener
         $method = $request->getMethod();
         $path = $request->getPathInfo();
         $ip = $request->getClientIp() ?? 'anon';
+
+        // Alta de salón: límite muy estricto (anti creación masiva de cuentas).
+        if ($method === 'POST' && $path === '/api/v1/signup') {
+            $this->enforce($event, $this->signupLimiter->create('signup:' . $ip));
+
+            return;
+        }
 
         // Las rutas de auth (login, forgot, reset) usan el limitador estricto.
         if ($method === 'POST' && str_starts_with($path, self::AUTH_PREFIX)) {

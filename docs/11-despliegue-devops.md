@@ -55,7 +55,13 @@ Cada entorno con su propia configuración (variables de entorno), sin credencial
 - El diseño multi-sede ya contempla crecer en número de sedes sin rehacer la arquitectura.
 
 ## 10. Checklist de puesta en producción
-- [ ] Variables de entorno de producción configuradas.
+- [ ] Variables de entorno de producción configuradas (ver `backend/.env.prod.example`).
+- [ ] **`APP_SECRET`** único y aleatorio de ≥32 caracteres (NO el del repo). La app **se niega a arrancar** en `prod` con un secreto inseguro/placeholder (guard en `AuthService`). Genera: `php -r "echo bin2hex(random_bytes(32));"`.
+- [ ] **Row-Level Security activo**: la app conecta como el rol restringido `peluqueria_app` (`DATABASE_URL`); migraciones y cron usan el owner.
+- [ ] **CORS** limitado a los dominios reales (`CORS_ALLOWED_ORIGINS`, sin `*`).
+- [ ] **Webhook de WhatsApp con firma**: define `WHATSAPP_APP_SECRET` (en `prod`, sin él, el webhook se rechaza — fail-closed).
+- [ ] **`TRUSTED_PROXIES`** con la IP/rango del balanceador (para que el rate limiting use la IP real).
+- [ ] `APP_ENV=prod` y `APP_DEBUG=0` (sin trazas de error).
 - [ ] Migraciones aplicadas.
 - [ ] Webhook de WhatsApp verificado y con firma validada.
 - [ ] Plantillas de WhatsApp aprobadas (doc 07).

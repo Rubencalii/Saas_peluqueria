@@ -8,6 +8,14 @@ framework:
     #esi: true
     #fragments: true
 
+when@prod:
+    framework:
+        # Tras un balanceador/reverse proxy: confía en X-Forwarded-* solo de los
+        # proxies indicados (TRUSTED_PROXIES, p. ej. "127.0.0.1,10.0.0.0/8") para
+        # que el rate limiting use la IP real del cliente y no la del proxy.
+        trusted_proxies: '%env(TRUSTED_PROXIES)%'
+        trusted_headers: ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-host', 'x-forwarded-port']
+
 when@test:
     framework:
         test: true

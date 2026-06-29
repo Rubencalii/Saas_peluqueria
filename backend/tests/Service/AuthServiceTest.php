@@ -28,6 +28,26 @@ final class AuthServiceTest extends KernelTestCase
         $this->auth = $svc;
     }
 
+    public function testRechazaSecretoInseguroEnProduccion(): void
+    {
+        /** @var \Doctrine\DBAL\Connection $db */
+        $db = static::getContainer()->get('doctrine.dbal.default_connection');
+
+        // En prod (debug=false), un secreto corto o placeholder revienta el arranque.
+        $this->expectException(\RuntimeException::class);
+        new AuthService($db, 'corto', false);
+    }
+
+    public function testAceptaSecretoFuerteEnProduccion(): void
+    {
+        /** @var \Doctrine\DBAL\Connection $db */
+        $db = static::getContainer()->get('doctrine.dbal.default_connection');
+
+        $strong = '0123456789abcdef0123456789abcdef0123456789abcdef';
+        $svc = new AuthService($db, $strong, false);
+        self::assertInstanceOf(AuthService::class, $svc);
+    }
+
     public function testLoginCorrectoEmiteTokenVerificable(): void
     {
         $result = $this->auth->login('recepcion@salon.es', 'recepcion1234');
