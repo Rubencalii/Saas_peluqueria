@@ -28,6 +28,7 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [view, setView] = useState<"day" | "week">("day");
 
   useEffect(() => {
     admin
@@ -48,14 +49,14 @@ export default function AgendaPage() {
     setLoading(true);
     setError(null);
     try {
-      setAgenda(await admin.agenda(locationId, date, "day"));
+      setAgenda(await admin.agenda(locationId, date, view));
     } catch {
       setError("No se pudo cargar la agenda.");
       setAgenda(null);
     } finally {
       setLoading(false);
     }
-  }, [locationId, date]);
+  }, [locationId, date, view]);
 
   useEffect(() => {
     void load();
@@ -108,18 +109,30 @@ export default function AgendaPage() {
         />
       ) : null}
 
-      <div className="flex items-center gap-2">
-        <button onClick={() => shiftDay(-1)} className="btn-ghost px-3 py-2">←</button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={() => shiftDay(view === "week" ? -7 : -1)} className="btn-ghost px-3 py-2">←</button>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           className="rounded-xl border border-border bg-card px-3 py-2 text-sm"
         />
-        <button onClick={() => shiftDay(1)} className="btn-ghost px-3 py-2">→</button>
-        <button onClick={() => setDate(isoDate(new Date()))} className="btn-ghost px-3 py-2 text-sm">
-          Hoy
-        </button>
+        <button onClick={() => shiftDay(view === "week" ? 7 : 1)} className="btn-ghost px-3 py-2">→</button>
+        <button onClick={() => setDate(isoDate(new Date()))} className="btn-ghost px-3 py-2 text-sm">Hoy</button>
+        <div className="ml-auto flex rounded-full border border-border bg-card p-0.5 text-sm">
+          <button
+            onClick={() => setView("day")}
+            className={"rounded-full px-3 py-1 font-medium " + (view === "day" ? "bg-brand text-brand-ink" : "text-muted")}
+          >
+            Día
+          </button>
+          <button
+            onClick={() => setView("week")}
+            className={"rounded-full px-3 py-1 font-medium " + (view === "week" ? "bg-brand text-brand-ink" : "text-muted")}
+          >
+            Semana
+          </button>
+        </div>
       </div>
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
@@ -130,7 +143,9 @@ export default function AgendaPage() {
             <div key={i} className="h-16 animate-pulse rounded-2xl bg-brand-soft/60" />
           ))}
         </div>
-      ) : agenda && agenda.appointments.length > 0 ? (
+      ) : !agenda ? null : view === "week" ? (
+        <WeekView agenda={agenda} tz={tz} onChanged={load} />
+      ) : agenda.appointments.length > 0 ? (
         <ul className="space-y-2">
           {agenda.appointments.map((a) => (
             <AppointmentRow key={a.appointment_id} appt={a} tz={tz} onChanged={load} />
@@ -139,6 +154,39 @@ export default function AgendaPage() {
       ) : (
         <p className="card p-6 text-center text-sm text-muted">No hay citas este día. 🙌</p>
       )}
+    </div>
+  );
+}
+
+function WeekView({ agenda, tz, onChanged }: { agenda: Agenda; tz: string; onChanged: () => void }) {
+  const dayKey = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(iso));
+  const dayLabel = (iso: string) =>
+    new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "short", timeZone: tz }).format(new Date(iso));
+
+  // 7 días desde el inicio de la semana (agenda.from, UTC ISO).
+  const startMs = new Date(agenda.from).getTime();
+  const days = Array.from({ length: 7 }, (_, i) => new Date(startMs + i * 86400000).toISOString());
+
+  return (
+    <div className="space-y-4">
+      {days.map((dIso) => {
+        const key = dayKey(dIso);
+        const appts = agenda.appointments.filter((a) => dayKey(a.start) === key);
+        return (
+          <section key={key}>
+            <h3 className="mb-2 text-sm font-semibold capitalize text-muted">{dayLabel(dIso)}</h3>
+            {appts.length === 0 ? (
+              <p className="rounded-xl bg-brand-soft/40 px-3 py-2 text-xs text-muted">Sin citas</p>
+            ) : (
+              <ul className="space-y-2">
+                {appts.map((a) => (
+                  <AppointmentRow key={a.appointment_id} appt={a} tz={tz} onChanged={onChanged} />
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }
