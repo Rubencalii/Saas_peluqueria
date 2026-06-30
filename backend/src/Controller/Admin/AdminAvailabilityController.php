@@ -53,4 +53,39 @@ final class AdminAvailabilityController extends AdminController
 
         return $this->json($data);
     }
+
+    /**
+     * Próximo hueco libre por profesional (buscando hacia delante desde `date`,
+     * o desde hoy si no se indica). Pensado para colocar rápido una cita.
+     */
+    #[Route('/api/v1/admin/availability/next', name: 'admin_availability_next', methods: ['GET'])]
+    public function nextByStaff(Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        $locationId = (int) $request->query->get('location_id', 0);
+        $serviceId = (int) $request->query->get('service_id', 0);
+        $from = (string) $request->query->get('date', '');
+        if ($from === '') {
+            $from = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        }
+
+        if ($locationId <= 0 || $serviceId <= 0) {
+            return $this->error('VALIDATION', 'Parámetros requeridos: location_id, service_id.', 400);
+        }
+
+        try {
+            $this->auth->assertLocationAccount($user, $locationId);
+            $this->auth->assertLocation($user, $locationId);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        try {
+            $staff = $this->availability->nextSlotsByStaff($locationId, $serviceId, $from);
+        } catch (\InvalidArgumentException $e) {
+            return $this->error('VALIDATION', $e->getMessage(), 400);
+        }
+
+        return $this->json(['staff' => $staff]);
+    }
 }

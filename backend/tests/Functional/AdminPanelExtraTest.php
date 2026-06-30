@@ -84,6 +84,54 @@ final class AdminPanelExtraTest extends WebTestCase
         self::assertStringNotContainsString('600555444', $phone);
     }
 
+    public function testProximoHuecoPorProfesional(): void
+    {
+        $token = $this->login();
+
+        // Sede 1 (centro) + servicio 2 (Corte hombre): hay personal que lo hace.
+        $data = $this->getJson('/api/v1/admin/availability/next?location_id=1&service_id=2', $token);
+        self::assertIsArray($data['staff']);
+        self::assertNotEmpty($data['staff'], 'Debe haber profesionales que ofrezcan el servicio.');
+
+        $algunoConHueco = false;
+        foreach ($data['staff'] as $s) {
+            self::assertArrayHasKey('staff_id', $s);
+            self::assertArrayHasKey('staff_name', $s);
+            self::assertArrayHasKey('next', $s);
+            if ($s['next'] !== null) {
+                self::assertArrayHasKey('date', $s['next']);
+                self::assertArrayHasKey('start', $s['next']);
+                $algunoConHueco = true;
+            }
+        }
+        self::assertTrue($algunoConHueco, 'Al menos un profesional debe tener hueco en las próximas semanas.');
+    }
+
+    public function testFiltroDeConsentimientoWhatsApp(): void
+    {
+        $token = $this->login();
+        $this->db->executeStatement(
+            "INSERT INTO customer (account_id, name, phone, wa_consent, consent_at)
+             VALUES (1, 'Con Consent', '+34600111222', TRUE, now())"
+        );
+        $this->db->executeStatement(
+            "INSERT INTO customer (account_id, name, phone, wa_consent) VALUES (1, 'Sin Consent', '+34600333444', FALSE)"
+        );
+
+        $withConsent = $this->getJson('/api/v1/admin/customers?consent=yes', $token);
+        $names = array_column($withConsent['customers'], 'name');
+        self::assertContains('Con Consent', $names);
+        self::assertNotContains('Sin Consent', $names);
+        foreach ($withConsent['customers'] as $c) {
+            self::assertTrue($c['wa_consent']);
+        }
+
+        $withoutConsent = $this->getJson('/api/v1/admin/customers?consent=no', $token);
+        foreach ($withoutConsent['customers'] as $c) {
+            self::assertFalse($c['wa_consent']);
+        }
+    }
+
     public function testCortaElPanelConSecretoInseguroEnHostNoLocal(): void
     {
         // En test el APP_SECRET es un placeholder inseguro: desde un host NO local
@@ -115,5 +163,14 @@ final class AdminPanelExtraTest extends WebTestCase
     private function get(string $path, string $token): void
     {
         $this->client->request('GET', $path, server: ['HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
+    }
+
+    /** @return array<string, mixed> */
+    private function getJson(string $path, string $token): array
+    {
+        $this->get($path, $token);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        return json_decode((string) $this->client->getResponse()->getContent(), true);
     }
 }

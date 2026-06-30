@@ -35,18 +35,28 @@ final class AdminCustomerController extends AdminController
     public function list(Request $request): JsonResponse
     {
         $query = trim((string) $request->query->get('query', ''));
+        $consent = (string) $request->query->get('consent', '');
         $pg = self::pagination($request);
         $accountId = self::user($request)['account_id'];
 
+        $conditions = ['account_id = ?'];
+        $params = [$accountId];
+
         if ($query !== '') {
-            $where = 'WHERE account_id = ? AND (name ILIKE ? OR phone ILIKE ?)';
-            $order = 'ORDER BY name';
-            $params = [$accountId, '%' . $query . '%', '%' . $query . '%'];
-        } else {
-            $where = 'WHERE account_id = ?';
-            $order = 'ORDER BY created_at DESC';
-            $params = [$accountId];
+            $conditions[] = '(name ILIKE ? OR phone ILIKE ?)';
+            $params[] = '%' . $query . '%';
+            $params[] = '%' . $query . '%';
         }
+        // Filtro por consentimiento de WhatsApp (para campañas/recordatorios).
+        if ($consent === 'yes') {
+            $conditions[] = 'wa_consent = TRUE';
+        } elseif ($consent === 'no') {
+            $conditions[] = 'wa_consent = FALSE';
+        }
+
+        $where = 'WHERE ' . implode(' AND ', $conditions);
+        // Con búsqueda ordenamos por nombre; sin ella, por alta reciente.
+        $order = $query !== '' ? 'ORDER BY name' : 'ORDER BY created_at DESC';
 
         $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM customer $where", $params);
         $rows = $this->db->fetchAllAssociative(

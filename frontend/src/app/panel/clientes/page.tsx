@@ -3,10 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { admin, type CustomerDetail, type CustomerList } from "@/lib/admin";
 import { formatDateLong, formatTime } from "@/lib/format";
+import { nextAppointment } from "@/lib/dashboard";
+
+type ConsentFilter = "" | "yes" | "no";
+
+const CONSENT_TABS: { value: ConsentFilter; label: string }[] = [
+  { value: "", label: "Todos" },
+  { value: "yes", label: "Con WhatsApp" },
+  { value: "no", label: "Sin WhatsApp" },
+];
 
 export default function ClientesPage() {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [consent, setConsent] = useState<ConsentFilter>("");
   const [page, setPage] = useState(1);
   const [list, setList] = useState<CustomerList | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,13 +41,13 @@ export default function ClientesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setList(await admin.customers(debounced, page));
+      setList(await admin.customers(debounced, page, consent));
     } catch {
       setList(null);
     } finally {
       setLoading(false);
     }
-  }, [debounced, page]);
+  }, [debounced, page, consent]);
 
   useEffect(() => {
     void load();
@@ -58,6 +68,21 @@ export default function ClientesPage() {
         placeholder="Buscar por nombre o teléfono…"
         className="field mt-0"
       />
+
+      <div className="flex gap-2">
+        {CONSENT_TABS.map((t) => (
+          <button
+            key={t.value}
+            onClick={() => { setConsent(t.value); setPage(1); }}
+            className={
+              "chip transition " +
+              (consent === t.value ? "bg-brand-soft text-foreground" : "bg-transparent text-muted hover:bg-brand-soft/60")
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       <div className="grid gap-5 md:grid-cols-[1fr_1.1fr]">
         <div>
@@ -148,6 +173,7 @@ function CustomerCard({
   onAnonymized: () => void;
 }) {
   const [data, setData] = useState<CustomerDetail | null>(null);
+  const [next, setNext] = useState<CustomerDetail["appointments"][number] | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
@@ -163,6 +189,7 @@ function CustomerCard({
         setData(r.customer);
         setName(r.customer.name);
         setEmail(r.customer.email ?? "");
+        setNext(nextAppointment(r.customer.appointments, Date.now()));
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false));
@@ -248,6 +275,18 @@ function CustomerCard({
           WhatsApp {data.wa_consent ? "sí" : "no"}
         </span>
       </div>
+
+      {next ? (
+        <div className="mt-4 rounded-xl border border-[var(--brand)] bg-brand-soft/50 px-3 py-2 text-sm">
+          <span className="font-medium">Próxima cita:</span>{" "}
+          <span className="capitalize">{formatDateLong(next.start, "Europe/Madrid")}</span> ·{" "}
+          {formatTime(next.start, "Europe/Madrid")} h
+          <span className="block text-muted">
+            {next.service_name} · {next.location_name}
+            {next.staff_name ? ` · ${next.staff_name}` : ""}
+          </span>
+        </div>
+      ) : null}
 
       {msg ? <p className="mt-3 text-sm text-red-700">{msg}</p> : null}
 

@@ -8,8 +8,9 @@ import {
   type AdminLocation,
   type AdminService,
   type AgendaAppointment,
+  type StaffNextSlot,
 } from "@/lib/admin";
-import { formatTime, isoDate } from "@/lib/format";
+import { formatDateLong, formatTime, isoDate } from "@/lib/format";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   pendiente: { label: "Pendiente", cls: "bg-amber-100 text-amber-800" },
@@ -28,6 +29,7 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [nextOpen, setNextOpen] = useState(false);
   const [view, setView] = useState<"day" | "week">("day");
 
   useEffect(() => {
@@ -88,11 +90,24 @@ export default function AgendaPage() {
               ))}
             </select>
           ) : null}
+          <button onClick={() => setNextOpen((v) => !v)} disabled={!locationId} className="btn-ghost px-4 py-2.5">
+            🔎 Próximo hueco
+          </button>
           <button onClick={() => setCreating(true)} disabled={!locationId} className="btn-primary px-4 py-2.5">
             + Nueva cita
           </button>
         </div>
       </header>
+
+      {nextOpen && locationId ? (
+        <NextSlotsPanel
+          locationId={locationId}
+          fromDate={date}
+          tz={tz}
+          services={services.filter((s) => s.active && s.locations.some((o) => o.location_id === locationId))}
+          onClose={() => setNextOpen(false)}
+        />
+      ) : null}
 
       {creating && locationId ? (
         <NewAppointment
@@ -187,6 +202,79 @@ function WeekView({ agenda, tz, onChanged }: { agenda: Agenda; tz: string; onCha
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function NextSlotsPanel({
+  locationId,
+  fromDate,
+  tz,
+  services,
+  onClose,
+}: {
+  locationId: number;
+  fromDate: string;
+  tz: string;
+  services: AdminService[];
+  onClose: () => void;
+}) {
+  const [serviceId, setServiceId] = useState<number | "">(services[0]?.id ?? "");
+  const [rows, setRows] = useState<StaffNextSlot[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (serviceId === "") {
+      setRows(null);
+      return;
+    }
+    setLoading(true);
+    admin
+      .nextSlotsByStaff(locationId, Number(serviceId), fromDate)
+      .then((r) => setRows(r.staff))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, [serviceId, locationId, fromDate]);
+
+  return (
+    <div className="card space-y-3 p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold">Próximo hueco libre por profesional</h2>
+        <button onClick={onClose} className="text-muted hover:text-foreground">✕</button>
+      </div>
+      <select
+        value={serviceId}
+        onChange={(e) => setServiceId(e.target.value === "" ? "" : Number(e.target.value))}
+        className="rounded-xl border border-border bg-card px-3 py-2 text-sm"
+      >
+        <option value="">Elige un servicio…</option>
+        {services.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+
+      {serviceId === "" ? null : loading ? (
+        <p className="text-sm text-muted">Buscando huecos…</p>
+      ) : rows && rows.length > 0 ? (
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <li key={r.staff_id} className="flex items-center justify-between gap-3 rounded-xl bg-brand-soft/50 px-3 py-2 text-sm">
+              <span className="font-medium">{r.staff_name}</span>
+              {r.next ? (
+                <span className="text-right text-muted">
+                  <span className="capitalize">{formatDateLong(r.next.start, tz)}</span> · {formatTime(r.next.start, tz)} h
+                </span>
+              ) : (
+                <span className="text-muted">Sin huecos próximos</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted">Nadie ofrece este servicio en esta sede.</p>
+      )}
     </div>
   );
 }

@@ -284,6 +284,12 @@ export interface ReportOccupancy {
   by_staff: Array<{ staff_id: number | null; staff_name: string | null; booked_minutes: number; appointments: number }>;
 }
 
+export interface StaffNextSlot {
+  staff_id: number;
+  staff_name: string;
+  next: { date: string; start: string } | null;
+}
+
 export interface ReportPeak {
   timezone: string;
   slots: Array<{ weekday: number; hour: number; appointments: number }>;
@@ -367,6 +373,12 @@ export const admin = {
       `/api/v1/admin/availability?location_id=${locationId}&service_id=${serviceId}&date=${date}`,
     ),
 
+  nextSlotsByStaff: (locationId: number, serviceId: number, date?: string) =>
+    adminFetch<{ staff: StaffNextSlot[] }>(
+      `/api/v1/admin/availability/next?location_id=${locationId}&service_id=${serviceId}` +
+        (date ? `&date=${date}` : ""),
+    ),
+
   createAppointment: (body: {
     location_id: number;
     service_id: number;
@@ -385,9 +397,10 @@ export const admin = {
   cancelAppointment: (id: number) =>
     adminFetch<unknown>(`/api/v1/admin/appointments/${id}`, { method: "DELETE" }),
 
-  customers: (query: string, page: number) =>
+  customers: (query: string, page: number, consent: "" | "yes" | "no" = "") =>
     adminFetch<CustomerList>(
-      `/api/v1/admin/customers?query=${encodeURIComponent(query)}&page=${page}&per_page=20`,
+      `/api/v1/admin/customers?query=${encodeURIComponent(query)}&page=${page}&per_page=20` +
+        (consent ? `&consent=${consent}` : ""),
     ),
 
   customer: (id: number) => adminFetch<{ customer: CustomerDetail }>(`/api/v1/admin/customers/${id}`),

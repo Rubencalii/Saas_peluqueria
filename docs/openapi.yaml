@@ -451,9 +451,24 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: query, in: query, schema: { type: string } }
+        - { name: consent, in: query, description: "Filtra por consentimiento de WhatsApp", schema: { type: string, enum: [yes, no] } }
         - { $ref: "#/components/parameters/Page" }
         - { $ref: "#/components/parameters/PerPage" }
       responses: { "200": { description: "Clientes + { page, per_page, total }" } }
+
+  /api/v1/admin/availability/next:
+    get:
+      tags: [Panel]
+      summary: Próximo hueco libre por profesional
+      description: Para el servicio/sede indicados, el primer hueco disponible de cada profesional buscando hacia delante desde `date` (o desde hoy).
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: location_id, in: query, required: true, schema: { type: integer } }
+        - { name: service_id, in: query, required: true, schema: { type: integer } }
+        - { name: date, in: query, description: "YYYY-MM-DD; por defecto, hoy", schema: { type: string } }
+      responses:
+        "200": { description: "{ staff: [{ staff_id, staff_name, next: { date, start } | null }] }" }
+        "400": { $ref: "#/components/responses/Error" }
 
   /api/v1/admin/customers/{id}:
     get:

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { admin, type PanelUser } from "@/lib/admin";
 import { formatPrice, formatTime } from "@/lib/format";
-import { upcomingAppointments, type DashItem } from "@/lib/dashboard";
+import { aggregateOccupancy, upcomingAppointments, type DashItem } from "@/lib/dashboard";
 
 function isoToday(): string {
   const n = new Date();
@@ -19,6 +19,7 @@ export default function PanelHome() {
   const [user, setUser] = useState<PanelUser | null>(null);
   const [today, setToday] = useState<number | null>(null);
   const [upcoming, setUpcoming] = useState<DashItem[]>([]);
+  const [occupancy, setOccupancy] = useState<number | null>(null);
   const [pendingWa, setPendingWa] = useState<number | null>(null);
   const [revenue, setRevenue] = useState<number | null>(null);
   const [rating, setRating] = useState<{ avg: number; count: number } | null>(null);
@@ -43,6 +44,17 @@ export default function PanelHome() {
         const all = agendas.flat();
         setToday(all.length);
         setUpcoming(upcomingAppointments(all, Date.now()));
+
+        // Ocupación de hoy: minutos reservados / capacidad, sumando las sedes.
+        const occ = await Promise.all(
+          locations.map((l) =>
+            admin
+              .reportOccupancy({ location_id: l.id, from: day, to: day })
+              .then((r) => ({ booked_minutes: r.booked_minutes, capacity_minutes: r.capacity_minutes }))
+              .catch(() => ({ booked_minutes: 0, capacity_minutes: 0 })),
+          ),
+        );
+        setOccupancy(aggregateOccupancy(occ));
       } catch {
         setToday(null);
       }
@@ -64,8 +76,9 @@ export default function PanelHome() {
         <p className="mt-1 text-muted">Un vistazo a tu salón.</p>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Kpi label="Citas hoy" value={today === null ? "—" : String(today)} href="/panel/agenda" />
+        <Kpi label="Ocupación hoy" value={occupancy === null ? "—" : `${Math.round(occupancy * 100)}%`} href="/panel/informes" />
         <Kpi label="WhatsApp pendientes" value={pendingWa === null ? "—" : String(pendingWa)} href="/panel/whatsapp" highlight={(pendingWa ?? 0) > 0} />
         <Kpi label="Ingresos del mes" value={revenue === null ? "—" : formatPrice(revenue)} href="/panel/informes" />
         <Kpi label="Valoración media" value={rating && rating.count > 0 ? `${rating.avg.toFixed(2)} ★` : "—"} href="/panel/valoraciones" />

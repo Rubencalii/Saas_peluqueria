@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { upcomingAppointments, type DashItem } from "./dashboard";
+import { aggregateOccupancy, nextAppointment, upcomingAppointments, type DashItem } from "./dashboard";
 
 function item(partial: Partial<DashItem> & { appointment_id: number; start: string; status: string }): DashItem {
   return {
@@ -44,5 +44,46 @@ describe("upcomingAppointments", () => {
       item({ appointment_id: i + 1, start: `2026-07-15T${String(11 + i).padStart(2, "0")}:00:00Z`, status: "confirmada" }),
     );
     expect(upcomingAppointments(items, NOW, 3)).toHaveLength(3);
+  });
+});
+
+describe("nextAppointment", () => {
+  it("devuelve la cita activa más cercana en el futuro", () => {
+    const r = nextAppointment(
+      [
+        { status: "confirmada", start: "2026-07-15T14:00:00Z" },
+        { status: "pendiente", start: "2026-07-15T11:30:00Z" },
+        { status: "confirmada", start: "2026-07-15T09:00:00Z" }, // pasada
+      ],
+      NOW,
+    );
+    expect(r?.start).toBe("2026-07-15T11:30:00Z");
+  });
+
+  it("ignora canceladas/completadas y devuelve null si no hay futuras", () => {
+    expect(
+      nextAppointment(
+        [
+          { status: "cancelada", start: "2026-07-15T18:00:00Z" },
+          { status: "completada", start: "2026-07-15T19:00:00Z" },
+        ],
+        NOW,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("aggregateOccupancy", () => {
+  it("suma reservado y capacidad de todas las sedes", () => {
+    const r = aggregateOccupancy([
+      { booked_minutes: 120, capacity_minutes: 480 },
+      { booked_minutes: 60, capacity_minutes: 240 },
+    ]);
+    expect(r).toBeCloseTo(180 / 720);
+  });
+
+  it("devuelve null si no hay capacidad", () => {
+    expect(aggregateOccupancy([{ booked_minutes: 0, capacity_minutes: 0 }])).toBeNull();
+    expect(aggregateOccupancy([])).toBeNull();
   });
 });

@@ -142,6 +142,62 @@ final class AvailabilityService
     }
 
     /**
+     * Próximo hueco libre de un profesional concreto, buscando hacia delante
+     * desde $fromDate hasta $maxDays días. null si no hay en la ventana.
+     *
+     * @return array{date: string, start: string}|null
+     */
+    public function nextSlotForStaff(int $locationId, int $serviceId, int $staffId, string $fromDate, int $maxDays = 21): ?array
+    {
+        $day = \DateTimeImmutable::createFromFormat('!Y-m-d', $fromDate);
+        if ($day === false) {
+            throw new \InvalidArgumentException('Fecha inválida (formato esperado: YYYY-MM-DD).');
+        }
+
+        for ($i = 0; $i < $maxDays; $i++) {
+            $date = $day->modify('+' . $i . ' day')->format('Y-m-d');
+            $slots = $this->find($locationId, $serviceId, $staffId, $date)['slots'];
+            if ($slots !== []) {
+                return ['date' => $date, 'start' => $slots[0]['start']];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Para cada profesional que puede hacer el servicio en la sede, su próximo
+     * hueco libre. Útil en el panel para colocar rápido una cita en el primer
+     * profesional disponible.
+     *
+     * @return list<array{staff_id: int, staff_name: string, next: array{date: string, start: string}|null}>
+     */
+    public function nextSlotsByStaff(int $locationId, int $serviceId, string $fromDate, int $maxDays = 21): array
+    {
+        $staff = $this->db->fetchAllAssociative(
+            'SELECT s.id, s.name
+               FROM staff s
+               JOIN staff_service  ss ON ss.staff_id = s.id AND ss.service_id = ?
+               JOIN staff_location sl ON sl.staff_id = s.id AND sl.location_id = ?
+              WHERE s.active
+              ORDER BY s.name',
+            [$serviceId, $locationId]
+        );
+
+        $out = [];
+        foreach ($staff as $row) {
+            $sid = (int) $row['id'];
+            $out[] = [
+                'staff_id' => $sid,
+                'staff_name' => (string) $row['name'],
+                'next' => $this->nextSlotForStaff($locationId, $serviceId, $sid, $fromDate, $maxDays),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Minutos totales que el servicio ocupa en la agenda (incluye reposos y margen).
      * Sirve para calcular end_at al crear/reprogramar una cita.
      */
