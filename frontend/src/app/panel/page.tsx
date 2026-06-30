@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { admin, type PanelUser } from "@/lib/admin";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, formatTime } from "@/lib/format";
+import { upcomingAppointments, type DashItem } from "@/lib/dashboard";
 
 function isoToday(): string {
   const n = new Date();
@@ -17,6 +18,7 @@ function isoFirstOfMonth(): string {
 export default function PanelHome() {
   const [user, setUser] = useState<PanelUser | null>(null);
   const [today, setToday] = useState<number | null>(null);
+  const [upcoming, setUpcoming] = useState<DashItem[]>([]);
   const [pendingWa, setPendingWa] = useState<number | null>(null);
   const [revenue, setRevenue] = useState<number | null>(null);
   const [rating, setRating] = useState<{ avg: number; count: number } | null>(null);
@@ -24,15 +26,23 @@ export default function PanelHome() {
   useEffect(() => {
     admin.me().then((r) => setUser(r.user)).catch(() => {});
 
-    // Citas de hoy: suma de las agendas de todas las sedes de la cuenta.
+    // Agenda de hoy: une las de todas las sedes de la cuenta para el contador y
+    // la lista de próximas citas.
     (async () => {
       try {
         const { locations } = await admin.locations();
         const day = isoToday();
-        const counts = await Promise.all(
-          locations.map((l) => admin.agenda(l.id, day, "day").then((a) => a.appointments.length).catch(() => 0)),
+        const agendas = await Promise.all(
+          locations.map((l) =>
+            admin
+              .agenda(l.id, day, "day")
+              .then((a) => a.appointments.map((ap) => ({ ...ap, locationName: a.location.name, timeZone: a.location.timezone })))
+              .catch(() => [] as DashItem[]),
+          ),
         );
-        setToday(counts.reduce((a, b) => a + b, 0));
+        const all = agendas.flat();
+        setToday(all.length);
+        setUpcoming(upcomingAppointments(all, Date.now()));
       } catch {
         setToday(null);
       }
@@ -60,6 +70,37 @@ export default function PanelHome() {
         <Kpi label="Ingresos del mes" value={revenue === null ? "—" : formatPrice(revenue)} href="/panel/informes" />
         <Kpi label="Valoración media" value={rating && rating.count > 0 ? `${rating.avg.toFixed(2)} ★` : "—"} href="/panel/valoraciones" />
       </div>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Próximas citas de hoy</h2>
+          <Link href="/panel/agenda" className="text-sm font-medium text-[var(--brand)] hover:underline">Ver agenda →</Link>
+        </div>
+        {today === null ? (
+          <p className="text-sm text-muted">No se pudo cargar la agenda.</p>
+        ) : upcoming.length === 0 ? (
+          <p className="card p-4 text-sm text-muted">No quedan citas por delante hoy. 🎉</p>
+        ) : (
+          <ul className="space-y-2">
+            {upcoming.map((a) => {
+              const showLoc = new Set(upcoming.map((u) => u.locationName)).size > 1;
+              return (
+                <li key={a.appointment_id} className="card flex items-center gap-3 p-3">
+                  <span className="w-14 shrink-0 text-center font-semibold tabular-nums">{formatTime(a.start, a.timeZone)}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{a.customer?.name ?? "Sin cliente"}</p>
+                    <p className="truncate text-sm text-muted">
+                      {a.service.name}
+                      {a.staff ? ` · ${a.staff.name}` : ""}
+                      {showLoc ? ` · ${a.locationName}` : ""}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Accesos rápidos</h2>
