@@ -1,37 +1,45 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { admin, type Conversation } from "@/lib/admin";
+import { admin, type Conversation, type ConversationList } from "@/lib/admin";
 
 export default function WhatsAppPage() {
   const [status, setStatus] = useState<"pendiente" | "all">("pendiente");
-  const [items, setItems] = useState<Conversation[]>([]);
+  const [page, setPage] = useState(1);
+  const [list, setList] = useState<ConversationList | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Conversation | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await admin.conversations(status, 1);
-      setItems(r.conversations);
+      setList(await admin.conversations(status, page));
     } catch {
-      setItems([]);
+      setList(null);
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, page]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  function changeStatus(s: "pendiente" | "all") {
+    setStatus(s);
+    setPage(1);
+  }
+
+  const items = list?.conversations ?? [];
+  const totalPages = list ? Math.max(1, Math.ceil(list.total / list.per_page)) : 1;
 
   return (
     <div className="space-y-5">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">WhatsApp</h1>
         <div className="flex rounded-full border border-border bg-card p-0.5 text-sm">
-          <Tab on={status === "pendiente"} onClick={() => setStatus("pendiente")}>Pendientes</Tab>
-          <Tab on={status === "all"} onClick={() => setStatus("all")}>Todas</Tab>
+          <Tab on={status === "pendiente"} onClick={() => changeStatus("pendiente")}>Pendientes</Tab>
+          <Tab on={status === "all"} onClick={() => changeStatus("all")}>Todas</Tab>
         </div>
       </header>
 
@@ -71,6 +79,26 @@ export default function WhatsAppPage() {
               ))}
             </ul>
           )}
+
+          {list && totalPages > 1 ? (
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="btn-ghost px-3 py-1.5 disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <span className="text-muted">{page} / {totalPages}</span>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="btn-ghost px-3 py-1.5 disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="md:sticky md:top-5 md:self-start">
