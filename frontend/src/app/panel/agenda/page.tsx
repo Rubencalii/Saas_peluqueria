@@ -13,7 +13,12 @@ import {
 import { formatDateLong, formatTime, isoDate } from "@/lib/format";
 
 /** Datos para abrir "Nueva cita" ya rellenada desde "Próximo hueco". */
-type NewApptPrefill = { serviceId: number; date: string; slot: { start: string; staff_id: number } };
+type NewApptPrefill = {
+  serviceId: number;
+  date: string;
+  staffName: string;
+  slot: { start: string; staff_id: number };
+};
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   pendiente: { label: "Pendiente", cls: "bg-amber-100 text-amber-800" },
@@ -285,6 +290,7 @@ function NextSlotsPanel({
                       onReserve({
                         serviceId: Number(serviceId),
                         date: r.next!.date,
+                        staffName: r.staff_name,
                         slot: { start: r.next!.start, staff_id: r.staff_id },
                       })
                     }
@@ -399,6 +405,14 @@ function NewAppointment({
         <h2 className="text-lg font-semibold">Nueva cita</h2>
         <button onClick={onClose} className="text-muted hover:text-foreground">✕</button>
       </div>
+
+      {prefill && Number(serviceId) === prefill.serviceId && date === prefill.date ? (
+        <div className="rounded-xl border border-[var(--brand)] bg-brand-soft/50 px-3 py-2 text-sm">
+          💡 Hueco sugerido para <span className="font-medium">{prefill.staffName}</span>:{" "}
+          <span className="capitalize">{formatDateLong(prefill.slot.start, tz)}</span> ·{" "}
+          {formatTime(prefill.slot.start, tz)} h. Solo falta indicar el cliente.
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-sm font-semibold">
