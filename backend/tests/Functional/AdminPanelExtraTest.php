@@ -194,6 +194,56 @@ final class AdminPanelExtraTest extends WebTestCase
         self::assertStringContainsString('SLOT_TAKEN', (string) $this->client->getResponse()->getContent());
     }
 
+    public function testReservaParaClienteExistenteLoReusaSinDuplicarNiRevocarConsentimiento(): void
+    {
+        $token = $this->login();
+        $phone = '+34655777888';
+
+        // Cliente ya registrado con consentimiento de WhatsApp.
+        $customerId = (int) $this->db->fetchOne(
+            "INSERT INTO customer (account_id, name, phone, email, wa_consent, consent_at)
+             VALUES (1, 'Cliente Buscable', ?, 'buscable@x.es', TRUE, now()) RETURNING id",
+            [$phone]
+        );
+
+        // 1) Aparece en la búsqueda del panel (lo que alimenta el selector "Existente").
+        $found = $this->getJson('/api/v1/admin/customers?query=Buscable', $token);
+        self::assertContains($customerId, array_column($found['customers'], 'id'));
+
+        // 2) Reservamos reusándolo: el panel manda nombre+teléfono, sin wa_consent.
+        $monday = (new \DateTimeImmutable('next monday'))->format('Y-m-d');
+        $offer = $this->getJson("/api/v1/admin/availability?location_id=1&service_id=2&date={$monday}", $token);
+        self::assertNotEmpty($offer['slots']);
+        $slot = $offer['slots'][0];
+
+        $body = [
+            'location_id' => 1,
+            'service_id' => 2,
+            'staff_id' => $slot['staff_id'],
+            'start' => $slot['start'],
+            'customer' => ['name' => 'Cliente Buscable', 'phone' => $phone],
+        ];
+        $this->client->request('POST', '/api/v1/admin/appointments', server: $this->auth($token), content: (string) json_encode($body));
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        $created = json_decode((string) $this->client->getResponse()->getContent(), true);
+
+        // 3) No se ha duplicado el cliente y la cita apunta al existente.
+        self::assertSame(
+            1,
+            (int) $this->db->fetchOne('SELECT COUNT(*) FROM customer WHERE account_id = 1 AND phone = ?', [$phone])
+        );
+        self::assertSame(
+            $customerId,
+            (int) $this->db->fetchOne('SELECT customer_id FROM appointment WHERE id = ?', [$created['appointment_id']])
+        );
+
+        // 4) El consentimiento sigue intacto tras reservar.
+        self::assertTrue(
+            (bool) $this->db->fetchOne('SELECT wa_consent FROM customer WHERE id = ?', [$customerId]),
+            'Reservar no debe revocar el consentimiento.'
+        );
+    }
+
     public function testCortaElPanelConSecretoInseguroEnHostNoLocal(): void
     {
         // En test el APP_SECRET es un placeholder inseguro: desde un host NO local
