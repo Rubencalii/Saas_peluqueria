@@ -183,4 +183,36 @@ final class AppointmentServiceTest extends DatabaseTestCase
         );
         self::assertSame($accountId, $accountOfCustomer);
     }
+
+    /**
+     * Reservar para un cliente que ya existe (alta por teléfono sin wa_consent,
+     * como hace el panel) NO debe revocar su consentimiento de WhatsApp. El alta
+     * solo puede otorgar consentimiento, nunca quitarlo (igual que la lista de
+     * espera): retirarlo es exclusivo del opt-out explícito o del RGPD.
+     */
+    public function testReservarNoRevocaElConsentimientoExistente(): void
+    {
+        $phone = '+34655010101';
+        $this->db->executeStatement(
+            'INSERT INTO customer (account_id, name, phone, wa_consent, consent_at)
+             VALUES (1, ?, ?, TRUE, now())',
+            ['Cliente Fiel', $phone]
+        );
+
+        [$slot] = $this->slots(1);
+        $this->appointments->create([
+            'location_id' => 1,
+            'service_id' => 2,
+            'staff_id' => null,
+            'start' => $slot,
+            'customer' => ['name' => 'Cliente Fiel', 'phone' => $phone],
+            'channel' => 'manual',
+        ]);
+
+        $consent = $this->db->fetchOne(
+            'SELECT wa_consent FROM customer WHERE account_id = 1 AND phone = ?',
+            [$phone]
+        );
+        self::assertTrue((bool) $consent, 'La reserva no debe revocar el consentimiento.');
+    }
 }

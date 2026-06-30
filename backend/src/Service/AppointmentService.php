@@ -183,7 +183,7 @@ final class AppointmentService
              ON CONFLICT (account_id, phone) DO UPDATE SET
                  name       = EXCLUDED.name,
                  email      = COALESCE(EXCLUDED.email, customer.email),
-                 wa_consent = EXCLUDED.wa_consent,
+                 wa_consent = customer.wa_consent OR EXCLUDED.wa_consent,
                  consent_at = CASE
                      WHEN EXCLUDED.wa_consent AND NOT customer.wa_consent THEN now()
                      ELSE customer.consent_at

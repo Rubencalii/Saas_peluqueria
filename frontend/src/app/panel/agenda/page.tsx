@@ -8,6 +8,7 @@ import {
   type AdminLocation,
   type AdminService,
   type AgendaAppointment,
+  type CustomerListItem,
   type StaffNextSlot,
 } from "@/lib/admin";
 import { formatDateLong, formatTime, isoDate } from "@/lib/format";
@@ -342,6 +343,56 @@ function NewAppointment({
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cliente: nuevo (se teclea) o existente (se busca y enlaza por teléfono).
+  const [customerMode, setCustomerMode] = useState<"new" | "existing">("new");
+  const [custQuery, setCustQuery] = useState("");
+  const [custResults, setCustResults] = useState<CustomerListItem[] | null>(null);
+  const [custLoading, setCustLoading] = useState(false);
+  const [picked, setPicked] = useState<CustomerListItem | null>(null);
+
+  useEffect(() => {
+    if (customerMode !== "existing" || picked) return;
+    const q = custQuery.trim();
+    if (q.length < 2) {
+      setCustResults(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setCustLoading(true);
+      admin
+        .customers(q, 1)
+        .then((r) => setCustResults(r.customers))
+        .catch(() => setCustResults([]))
+        .finally(() => setCustLoading(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [custQuery, customerMode, picked]);
+
+  function pickCustomer(c: CustomerListItem) {
+    setPicked(c);
+    setName(c.name);
+    setPhone(c.phone);
+    setEmail(c.email ?? "");
+    setCustResults(null);
+  }
+
+  function clearPicked() {
+    setPicked(null);
+    setCustQuery("");
+    setName("");
+    setPhone("");
+    setEmail("");
+  }
+
+  function changeCustomerMode(m: "new" | "existing") {
+    setCustomerMode(m);
+    setPicked(null);
+    setCustQuery("");
+    setCustResults(null);
+    setName("");
+    setPhone("");
+    setEmail("");
+  }
 
   useEffect(() => {
     if (serviceId === "") {
@@ -372,6 +423,10 @@ function NewAppointment({
   }, [serviceId, date, locationId, prefill]);
 
   async function submit() {
+    if (customerMode === "existing" && !picked) {
+      setError("Busca y elige un cliente, o cambia a cliente nuevo.");
+      return;
+    }
     if (serviceId === "" || !slot || name.trim() === "" || phone.trim() === "") {
       setError("Completa servicio, hueco, nombre y teléfono.");
       return;
@@ -459,10 +514,76 @@ function NewAppointment({
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del cliente" className="field" />
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Teléfono" className="field" />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (opcional)" className="field" />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold">Cliente</p>
+          <div className="flex rounded-full border border-border bg-card p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => changeCustomerMode("new")}
+              className={"rounded-full px-3 py-1 font-medium " + (customerMode === "new" ? "bg-brand text-brand-ink" : "text-muted")}
+            >
+              Nuevo
+            </button>
+            <button
+              type="button"
+              onClick={() => changeCustomerMode("existing")}
+              className={"rounded-full px-3 py-1 font-medium " + (customerMode === "existing" ? "bg-brand text-brand-ink" : "text-muted")}
+            >
+              Existente
+            </button>
+          </div>
+        </div>
+
+        {customerMode === "new" ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del cliente" className="field" />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Teléfono" className="field" />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (opcional)" className="field" />
+          </div>
+        ) : picked ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--brand)] bg-brand-soft/50 px-3 py-2 text-sm">
+            <span className="min-w-0 truncate">
+              <span className="font-medium">{picked.name}</span> · {picked.phone}
+              {picked.wa_consent ? (
+                <span className="ml-2 chip bg-emerald-100 text-emerald-800">WhatsApp sí</span>
+              ) : null}
+            </span>
+            <button type="button" onClick={clearPicked} className="btn-ghost shrink-0 px-3 py-1 text-xs">
+              Cambiar
+            </button>
+          </div>
+        ) : (
+          <div>
+            <input
+              value={custQuery}
+              onChange={(e) => setCustQuery(e.target.value)}
+              placeholder="Buscar por nombre o teléfono…"
+              className="field"
+            />
+            {custLoading ? (
+              <p className="mt-2 text-sm text-muted">Buscando…</p>
+            ) : custResults && custResults.length > 0 ? (
+              <ul className="mt-2 max-h-44 space-y-1 overflow-auto">
+                {custResults.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => pickCustomer(c)}
+                      className="w-full rounded-xl bg-brand-soft/40 px-3 py-2 text-left text-sm transition hover:bg-brand-soft"
+                    >
+                      <span className="font-medium">{c.name}</span> · {c.phone}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : custResults && custQuery.trim().length >= 2 ? (
+              <p className="mt-2 text-sm text-muted">Sin coincidencias. Prueba con otro dato o crea un cliente nuevo.</p>
+            ) : (
+              <p className="mt-2 text-xs text-muted">Escribe al menos 2 caracteres.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
