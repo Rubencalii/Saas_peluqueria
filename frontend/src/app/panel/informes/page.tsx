@@ -14,6 +14,7 @@ import {
 } from "@/lib/admin";
 import { formatPrice } from "@/lib/format";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import { reportCsvRows } from "@/lib/reports";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -83,19 +84,7 @@ export default function InformesPage() {
   }, [load]);
 
   function exportCsv() {
-    const rows: Array<Array<string | number | null>> = [];
-    rows.push(["Periodo", `${from} a ${to}`]);
-    rows.push(["Ingresos", revenue ? revenue.total_revenue : ""]);
-    rows.push(["Tasa no-show", noShows && noShows.no_show_rate !== null ? noShows.no_show_rate : ""]);
-    rows.push(["Retención", retention && retention.retention_rate !== null ? retention.retention_rate : ""]);
-    rows.push(["Valoración media", ratings && ratings.count > 0 ? ratings.average : ""]);
-    rows.push([]);
-    rows.push(["Ingresos por servicio", "Citas", "€"]);
-    for (const r of revenue?.by_service ?? []) rows.push([r.service_name, r.appointments, r.revenue]);
-    rows.push([]);
-    rows.push(["Ingresos por profesional", "Citas", "€"]);
-    for (const r of revenue?.by_staff ?? []) rows.push([r.staff_name ?? "Sin asignar", r.appointments, r.revenue]);
-
+    const rows = reportCsvRows({ from, to, revenue, channel, noShows, retention, ratings, occupancy, peak });
     downloadCsv(`informe_${from}_${to}.csv`, toCsv(["Concepto", "Valor", ""], rows));
   }
 
