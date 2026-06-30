@@ -132,6 +132,68 @@ final class AdminPanelExtraTest extends WebTestCase
         }
     }
 
+    public function testAltaManualDeCitaPorElPanel(): void
+    {
+        $token = $this->login();
+        $monday = (new \DateTimeImmutable('next monday'))->format('Y-m-d');
+
+        // Hueco real ofertado (sede 1 + servicio 2), igual que dispara "Reservar".
+        $offer = $this->getJson("/api/v1/admin/availability?location_id=1&service_id=2&date={$monday}", $token);
+        self::assertNotEmpty($offer['slots'], 'El seed debe ofrecer huecos el próximo lunes.');
+        $slot = $offer['slots'][0];
+
+        $body = [
+            'location_id' => 1,
+            'service_id' => 2,
+            'staff_id' => $slot['staff_id'],
+            'start' => $slot['start'],
+            'channel' => 'web', // el panel lo fuerza a "manual": debe ignorarse
+            'customer' => ['name' => 'Cliente Manual', 'phone' => '+34600999888', 'email' => 'manual@x.es'],
+        ];
+        $this->client->request('POST', '/api/v1/admin/appointments', server: $this->auth($token), content: (string) json_encode($body));
+
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        $created = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertSame('confirmada', $created['status']);
+        self::assertSame($slot['staff_id'], $created['staff_id']);
+        self::assertNotEmpty($created['public_code']);
+
+        // Persistió como cita manual, con el cliente y la trazabilidad de quién la creó.
+        $row = $this->db->fetchAssociative(
+            'SELECT channel, created_by, customer_id FROM appointment WHERE id = ?',
+            [$created['appointment_id']]
+        );
+        self::assertSame('manual', $row['channel']);
+        self::assertNotNull($row['created_by']);
+        self::assertSame(
+            '+34600999888',
+            $this->db->fetchOne('SELECT phone FROM customer WHERE id = ?', [(int) $row['customer_id']])
+        );
+    }
+
+    public function testElPanelRechazaUnHuecoNoOfrecido(): void
+    {
+        $token = $this->login();
+        $monday = (new \DateTimeImmutable('next monday'))->format('Y-m-d');
+
+        $offer = $this->getJson("/api/v1/admin/availability?location_id=1&service_id=2&date={$monday}", $token);
+        self::assertNotEmpty($offer['slots']);
+
+        // Desplazado 5 min: cae fuera del grid de 15 min, no es un hueco ofertado.
+        $bogusStart = (new \DateTimeImmutable($offer['slots'][0]['start']))->modify('+5 minutes')->format('c');
+        $body = [
+            'location_id' => 1,
+            'service_id' => 2,
+            'staff_id' => $offer['slots'][0]['staff_id'],
+            'start' => $bogusStart,
+            'customer' => ['name' => 'No Cabe', 'phone' => '+34600111000'],
+        ];
+        $this->client->request('POST', '/api/v1/admin/appointments', server: $this->auth($token), content: (string) json_encode($body));
+
+        self::assertSame(409, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('SLOT_TAKEN', (string) $this->client->getResponse()->getContent());
+    }
+
     public function testCortaElPanelConSecretoInseguroEnHostNoLocal(): void
     {
         // En test el APP_SECRET es un placeholder inseguro: desde un host NO local
