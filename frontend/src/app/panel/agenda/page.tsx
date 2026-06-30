@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   admin,
   AdminApiError,
@@ -11,6 +11,9 @@ import {
   type StaffNextSlot,
 } from "@/lib/admin";
 import { formatDateLong, formatTime, isoDate } from "@/lib/format";
+
+/** Datos para abrir "Nueva cita" ya rellenada desde "Próximo hueco". */
+type NewApptPrefill = { serviceId: number; date: string; slot: { start: string; staff_id: number } };
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   pendiente: { label: "Pendiente", cls: "bg-amber-100 text-amber-800" },
@@ -29,6 +32,7 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [prefill, setPrefill] = useState<NewApptPrefill | null>(null);
   const [nextOpen, setNextOpen] = useState(false);
   const [view, setView] = useState<"day" | "week">("day");
 
@@ -93,7 +97,11 @@ export default function AgendaPage() {
           <button onClick={() => setNextOpen((v) => !v)} disabled={!locationId} className="btn-ghost px-4 py-2.5">
             🔎 Próximo hueco
           </button>
-          <button onClick={() => setCreating(true)} disabled={!locationId} className="btn-primary px-4 py-2.5">
+          <button
+            onClick={() => { setPrefill(null); setCreating(true); }}
+            disabled={!locationId}
+            className="btn-primary px-4 py-2.5"
+          >
             + Nueva cita
           </button>
         </div>
@@ -105,6 +113,7 @@ export default function AgendaPage() {
           fromDate={date}
           tz={tz}
           services={services.filter((s) => s.active && s.locations.some((o) => o.location_id === locationId))}
+          onReserve={(p) => { setNextOpen(false); setPrefill(p); setCreating(true); }}
           onClose={() => setNextOpen(false)}
         />
       ) : null}
@@ -114,10 +123,12 @@ export default function AgendaPage() {
           locationId={locationId}
           date={date}
           tz={tz}
+          prefill={prefill}
           services={services.filter((s) => s.active && s.locations.some((o) => o.location_id === locationId))}
-          onClose={() => setCreating(false)}
+          onClose={() => { setCreating(false); setPrefill(null); }}
           onCreated={async (d) => {
             setCreating(false);
+            setPrefill(null);
             setDate(d);
             await load();
           }}
@@ -211,12 +222,14 @@ function NextSlotsPanel({
   fromDate,
   tz,
   services,
+  onReserve,
   onClose,
 }: {
   locationId: number;
   fromDate: string;
   tz: string;
   services: AdminService[];
+  onReserve: (p: NewApptPrefill) => void;
   onClose: () => void;
 }) {
   const [serviceId, setServiceId] = useState<number | "">(services[0]?.id ?? "");
@@ -263,9 +276,23 @@ function NextSlotsPanel({
             <li key={r.staff_id} className="flex items-center justify-between gap-3 rounded-xl bg-brand-soft/50 px-3 py-2 text-sm">
               <span className="font-medium">{r.staff_name}</span>
               {r.next ? (
-                <span className="text-right text-muted">
-                  <span className="capitalize">{formatDateLong(r.next.start, tz)}</span> · {formatTime(r.next.start, tz)} h
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-right text-muted">
+                    <span className="capitalize">{formatDateLong(r.next.start, tz)}</span> · {formatTime(r.next.start, tz)} h
+                  </span>
+                  <button
+                    onClick={() =>
+                      onReserve({
+                        serviceId: Number(serviceId),
+                        date: r.next!.date,
+                        slot: { start: r.next!.start, staff_id: r.staff_id },
+                      })
+                    }
+                    className="btn-primary shrink-0 px-3 py-1.5 text-xs"
+                  >
+                    Reservar
+                  </button>
+                </div>
               ) : (
                 <span className="text-muted">Sin huecos próximos</span>
               )}
@@ -284,6 +311,7 @@ function NewAppointment({
   date: agendaDate,
   tz,
   services,
+  prefill,
   onClose,
   onCreated,
 }: {
@@ -291,14 +319,18 @@ function NewAppointment({
   date: string;
   tz: string;
   services: AdminService[];
+  prefill: NewApptPrefill | null;
   onClose: () => void;
   onCreated: (date: string) => void;
 }) {
-  const [serviceId, setServiceId] = useState<number | "">("");
-  const [date, setDate] = useState(agendaDate);
+  const [serviceId, setServiceId] = useState<number | "">(prefill?.serviceId ?? "");
+  const [date, setDate] = useState(prefill?.date ?? agendaDate);
   const [slots, setSlots] = useState<Array<{ start: string; staff_id: number }> | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slot, setSlot] = useState<{ start: string; staff_id: number } | null>(null);
+  // El prefill viene de "Próximo hueco": preselecciona el hueco una sola vez,
+  // cuando llega la disponibilidad del día (el efecto resetea slot al cargar).
+  const prefillApplied = useRef(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -314,10 +346,24 @@ function NewAppointment({
     setSlot(null);
     admin
       .availability(locationId, Number(serviceId), date)
-      .then((r) => setSlots(r.slots))
+      .then((r) => {
+        setSlots(r.slots);
+        if (
+          prefill &&
+          !prefillApplied.current &&
+          date === prefill.date &&
+          Number(serviceId) === prefill.serviceId
+        ) {
+          prefillApplied.current = true;
+          // Sólo si el hueco sigue libre (puede haberse ocupado entretanto).
+          if (r.slots.some((s) => s.start === prefill.slot.start)) {
+            setSlot(prefill.slot);
+          }
+        }
+      })
       .catch(() => setSlots([]))
       .finally(() => setLoadingSlots(false));
-  }, [serviceId, date, locationId]);
+  }, [serviceId, date, locationId, prefill]);
 
   async function submit() {
     if (serviceId === "" || !slot || name.trim() === "" || phone.trim() === "") {
