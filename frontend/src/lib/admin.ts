@@ -306,6 +306,53 @@ export interface ReportPeak {
   slots: Array<{ weekday: number; hour: number; appointments: number }>;
 }
 
+export interface PanelTeamUser {
+  id: number;
+  name: string;
+  email: string;
+  role: PanelUser["role"];
+  location: { id: number; name: string } | null;
+  active: boolean;
+}
+
+export interface RecurringItem {
+  id: number;
+  weekday: number; // 0 = lunes … 6 = domingo
+  time: string; // HH:MM (hora local de la sede)
+  interval_weeks: number;
+  last_generated_date: string | null;
+  service_name: string;
+  staff_name: string | null;
+  customer: { name: string; phone: string };
+}
+
+export interface RecurringInput {
+  location_id: number;
+  service_id: number;
+  staff_id: number | null;
+  customer: { name: string; phone: string };
+  weekday: number;
+  time: string;
+  interval_weeks: number;
+}
+
+export interface AuditEntry {
+  id: number;
+  user_id: number | null;
+  user_email: string | null;
+  method: string;
+  path: string;
+  status_code: number;
+  created_at: string;
+}
+
+export interface AuditList {
+  audit: AuditEntry[];
+  page: number;
+  per_page: number;
+  total: number;
+}
+
 export class AdminApiError extends Error {
   constructor(
     public readonly code: string,
@@ -487,6 +534,21 @@ export const admin = {
   },
 
   account: () => adminFetch<Account>("/api/v1/admin/account"),
+
+  audit: (page: number) => adminFetch<AuditList>(`/api/v1/admin/audit?page=${page}&per_page=25`),
+
+  users: () => adminFetch<{ users: PanelTeamUser[] }>("/api/v1/admin/users"),
+  createUser: (body: { name: string; email: string; password: string; role: string; location_id: number | null }) =>
+    adminFetch<{ id: number }>("/api/v1/admin/users", { method: "POST", body }),
+  updateUser: (id: number, body: Partial<{ name: string; role: string; location_id: number | null; active: boolean }>) =>
+    adminFetch<{ user: PanelTeamUser }>(`/api/v1/admin/users/${id}`, { method: "PATCH", body }),
+
+  recurring: (locationId: number) =>
+    adminFetch<{ recurring: RecurringItem[] }>(`/api/v1/admin/recurring?location_id=${locationId}`),
+  createRecurring: (body: RecurringInput) =>
+    adminFetch<{ id: number }>("/api/v1/admin/recurring", { method: "POST", body }),
+  deleteRecurring: (id: number) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/recurring/${id}`, { method: "DELETE" }),
 
   billingCheckout: (planCode: string) =>
     adminFetch<{ url: string }>("/api/v1/admin/billing/checkout", { method: "POST", body: { plan_code: planCode } }),

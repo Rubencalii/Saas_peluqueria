@@ -7,7 +7,7 @@ import { admin, clearToken, getToken, type PanelUser } from "@/lib/admin";
 import { brandName, brandVars, type Branding } from "@/lib/theme";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-const NAV = [
+const NAV: Array<{ href: string; label: string; icon: string; roles?: string[] }> = [
   { href: "/panel", label: "Inicio", icon: "🏡" },
   { href: "/panel/agenda", label: "Agenda", icon: "📅" },
   { href: "/panel/clientes", label: "Clientes", icon: "👥" },
@@ -17,10 +17,13 @@ const NAV = [
   { href: "/panel/sedes", label: "Sedes", icon: "🏠" },
   { href: "/panel/whatsapp", label: "WhatsApp", icon: "💬" },
   { href: "/panel/espera", label: "Lista de espera", icon: "⏳" },
+  { href: "/panel/recurrentes", label: "Recurrentes", icon: "🔁", roles: ["recepcion", "admin_sede", "admin_cadena"] },
   { href: "/panel/valoraciones", label: "Valoraciones", icon: "⭐" },
   { href: "/panel/informes", label: "Informes", icon: "📊" },
   { href: "/panel/cuenta", label: "Cuenta", icon: "💳" },
   { href: "/panel/apariencia", label: "Apariencia", icon: "🎨" },
+  { href: "/panel/usuarios", label: "Usuarios", icon: "🔐", roles: ["admin_cadena"] },
+  { href: "/panel/auditoria", label: "Auditoría", icon: "🧾", roles: ["admin_cadena"] },
 ];
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
@@ -101,7 +104,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           <span className="truncate font-semibold tracking-tight">{brandName(branding, "Panel")}</span>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:overflow-visible">
-          {NAV.map((item) => {
+          {NAV.filter((item) => !item.roles || (user !== null && item.roles.includes(user.role))).map((item) => {
             const active = item.href === "/panel" ? pathname === "/panel" : pathname.startsWith(item.href);
             return (
               <Link
