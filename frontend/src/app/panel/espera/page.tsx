@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { admin, type WaitlistItem } from "@/lib/admin";
+import { admin, type WaitlistList } from "@/lib/admin";
 
 const STATUS: Record<string, string> = {
   esperando: "Esperando",
@@ -12,24 +12,27 @@ const STATUS: Record<string, string> = {
 
 export default function EsperaPage() {
   const [status, setStatus] = useState("esperando");
-  const [items, setItems] = useState<WaitlistItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [list, setList] = useState<WaitlistList | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await admin.waitlist(null, status, 1);
-      setItems(r.waitlist);
+      setList(await admin.waitlist(null, status, page));
     } catch {
-      setItems([]);
+      setList(null);
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, page]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const items = list?.waitlist ?? [];
+  const totalPages = list ? Math.max(1, Math.ceil(list.total / list.per_page)) : 1;
 
   async function cancel(id: number) {
     if (!confirm("¿Dar de baja esta entrada de la lista de espera?")) return;
@@ -41,7 +44,7 @@ export default function EsperaPage() {
     <div className="space-y-5">
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Lista de espera</h1>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
+        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
           {Object.entries(STATUS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
@@ -81,6 +84,26 @@ export default function EsperaPage() {
           ))}
         </ul>
       )}
+
+      {!loading && list && totalPages > 1 ? (
+        <div className="flex items-center justify-between text-sm">
+          <button
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="btn-ghost px-3 py-1.5 disabled:opacity-40"
+          >
+            Anterior
+          </button>
+          <span className="text-muted">{page} / {totalPages}</span>
+          <button
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="btn-ghost px-3 py-1.5 disabled:opacity-40"
+          >
+            Siguiente
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

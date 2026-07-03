@@ -103,7 +103,14 @@ export default function WhatsAppPage() {
 
         <div className="md:sticky md:top-5 md:self-start">
           {selected ? (
-            <Reply conversation={selected} onDone={async () => { await load(); }} />
+            <Reply
+              conversation={selected}
+              onDone={async (resolved) => {
+                // Al resolver, la conversación sale de "Pendientes": cierra la ficha.
+                if (resolved && status === "pendiente") setSelected(null);
+                await load();
+              }}
+            />
           ) : (
             <p className="card grid h-40 place-items-center p-6 text-center text-sm text-muted">
               Elige una conversación para responder.
@@ -126,7 +133,7 @@ function Tab({ on, onClick, children }: { on: boolean; onClick: () => void; chil
   );
 }
 
-function Reply({ conversation, onDone }: { conversation: Conversation; onDone: () => void }) {
+function Reply({ conversation, onDone }: { conversation: Conversation; onDone: (resolved: boolean) => void }) {
   const [message, setMessage] = useState("");
   const [resolve, setResolve] = useState(true);
   const [sending, setSending] = useState(false);
@@ -140,7 +147,7 @@ function Reply({ conversation, onDone }: { conversation: Conversation; onDone: (
       await admin.replyConversation(conversation.wa_id, message.trim(), resolve);
       setMessage("");
       setMsg({ ok: true, text: resolve ? "Respondido y devuelto al bot." : "Respuesta enviada." });
-      await onDone();
+      await onDone(resolve);
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "No se pudo enviar." });
     } finally {
