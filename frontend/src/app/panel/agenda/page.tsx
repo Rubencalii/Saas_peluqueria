@@ -41,6 +41,8 @@ export default function AgendaPage() {
   const [prefill, setPrefill] = useState<NewApptPrefill | null>(null);
   const [nextOpen, setNextOpen] = useState(false);
   const [view, setView] = useState<"day" | "week">("day");
+  const [myStaffId, setMyStaffId] = useState<number | null>(null);
+  const [onlyMine, setOnlyMine] = useState(false);
 
   useEffect(() => {
     admin
@@ -53,6 +55,14 @@ export default function AgendaPage() {
     admin
       .services()
       .then((r) => setServices(r.services))
+      .catch(() => {});
+    admin
+      .me()
+      .then((r) => {
+        setMyStaffId(r.user.staff_id ?? null);
+        // "Mi día": un profesional entra viendo solo su propia agenda.
+        if (r.user.role === "profesional" && r.user.staff_id) setOnlyMine(true);
+      })
       .catch(() => {});
   }, []);
 
@@ -81,6 +91,12 @@ export default function AgendaPage() {
   }
 
   const tz = agenda?.location.timezone ?? "Europe/Madrid";
+
+  // Con "solo mis citas" activo, la agenda se filtra a la ficha del usuario.
+  const shownAgenda =
+    agenda && onlyMine && myStaffId
+      ? { ...agenda, appointments: agenda.appointments.filter((a) => a.staff?.id === myStaffId) }
+      : agenda;
 
   return (
     <div className="space-y-5">
@@ -151,6 +167,17 @@ export default function AgendaPage() {
         />
         <button onClick={() => shiftDay(view === "week" ? 7 : 1)} className="btn-ghost px-3 py-2">→</button>
         <button onClick={() => setDate(isoDate(new Date()))} className="btn-ghost px-3 py-2 text-sm">Hoy</button>
+        {myStaffId ? (
+          <button
+            onClick={() => setOnlyMine((v) => !v)}
+            className={
+              "chip transition " +
+              (onlyMine ? "bg-brand-soft text-foreground" : "bg-transparent text-muted hover:bg-brand-soft/60")
+            }
+          >
+            👤 Solo mis citas
+          </button>
+        ) : null}
         <div className="ml-auto flex rounded-full border border-border bg-card p-0.5 text-sm">
           <button
             onClick={() => setView("day")}
@@ -175,16 +202,18 @@ export default function AgendaPage() {
             <div key={i} className="h-16 animate-pulse rounded-2xl bg-brand-soft/60" />
           ))}
         </div>
-      ) : !agenda ? null : view === "week" ? (
-        <WeekView agenda={agenda} tz={tz} onChanged={load} />
-      ) : agenda.appointments.length > 0 ? (
+      ) : !shownAgenda ? null : view === "week" ? (
+        <WeekView agenda={shownAgenda} tz={tz} onChanged={load} />
+      ) : shownAgenda.appointments.length > 0 ? (
         <ul className="space-y-2">
-          {agenda.appointments.map((a) => (
+          {shownAgenda.appointments.map((a) => (
             <AppointmentRow key={a.appointment_id} appt={a} tz={tz} onChanged={load} />
           ))}
         </ul>
       ) : (
-        <p className="card p-6 text-center text-sm text-muted">No hay citas este día. 🙌</p>
+        <p className="card p-6 text-center text-sm text-muted">
+          {onlyMine && myStaffId ? "No tienes citas este día. 🙌" : "No hay citas este día. 🙌"}
+        </p>
       )}
     </div>
   );

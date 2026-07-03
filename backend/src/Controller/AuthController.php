@@ -23,6 +23,7 @@ final class AuthController extends AbstractController
         private readonly AuthService $auth,
         private readonly PasswordResetService $passwordReset,
         private readonly \App\Service\Tenant\EmailVerificationService $emailVerification,
+        private readonly \Doctrine\DBAL\Connection $db,
     ) {
     }
 
@@ -126,6 +127,14 @@ final class AuthController extends AbstractController
     {
         $user = AdminController::user($request);
         $user['email_verified'] = $this->emailVerification->isVerified($user['id']);
+
+        // Vínculo con su ficha de profesional (por email, dentro de la cuenta):
+        // permite al panel filtrar "mis citas" para el rol profesional.
+        $staffId = $this->db->fetchOne(
+            'SELECT id FROM staff WHERE account_id = ? AND lower(email) = lower(?) AND active',
+            [$user['account_id'], $user['email']]
+        );
+        $user['staff_id'] = $staffId !== false ? (int) $staffId : null;
 
         return $this->json(['user' => $user]);
     }

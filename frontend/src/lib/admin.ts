@@ -14,6 +14,8 @@ export interface PanelUser {
   account_id: number;
   is_superadmin: boolean;
   email_verified?: boolean;
+  /** Ficha de profesional vinculada por email (para filtrar "mis citas"). */
+  staff_id?: number | null;
 }
 
 export interface SaAccount {

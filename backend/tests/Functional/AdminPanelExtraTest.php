@@ -244,6 +244,36 @@ final class AdminPanelExtraTest extends WebTestCase
         );
     }
 
+    public function testMeExponeSuFichaDeProfesionalPorEmail(): void
+    {
+        // Un usuario del panel con rol profesional cuya ficha de staff comparte
+        // email debe ver su staff_id en /me (para filtrar "mis citas").
+        $staffId = (int) $this->db->fetchOne(
+            "INSERT INTO staff (account_id, name, email, active) VALUES (1, 'Pro Panel', 'pro.panel@salon.es', TRUE) RETURNING id"
+        );
+        $this->db->executeStatement(
+            "INSERT INTO app_user (account_id, name, email, password_hash, role, location_id, active)
+             VALUES (1, 'Pro Panel', 'pro.panel@salon.es', ?, 'profesional', 1, TRUE)",
+            [password_hash('secreta123', PASSWORD_BCRYPT)]
+        );
+
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/login',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: (string) json_encode(['email' => 'pro.panel@salon.es', 'password' => 'secreta123']),
+        );
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $token = (string) json_decode((string) $this->client->getResponse()->getContent(), true)['token'];
+
+        $me = $this->getJson('/api/v1/admin/me', $token);
+        self::assertSame($staffId, $me['user']['staff_id']);
+
+        // El admin del seed no tiene ficha de staff: staff_id null.
+        $adminMe = $this->getJson('/api/v1/admin/me', $this->login());
+        self::assertNull($adminMe['user']['staff_id']);
+    }
+
     public function testCortaElPanelConSecretoInseguroEnHostNoLocal(): void
     {
         // En test el APP_SECRET es un placeholder inseguro: desde un host NO local
