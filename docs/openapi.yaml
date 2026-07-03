@@ -686,6 +686,57 @@ paths:
         - { $ref: "#/components/parameters/PerPage" }
       responses: { "200": { description: "Auditoría + { page, per_page, total }" }, "403": { $ref: "#/components/responses/Error" } }
 
+  /api/v1/admin/users:
+    get:
+      tags: [Panel]
+      summary: "Usuarios del panel de la cuenta (solo admin_cadena)"
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: "{ users: [{ id, name, email, role, location, active }] }" }, "403": { $ref: "#/components/responses/Error" } }
+    post:
+      tags: [Panel]
+      summary: "Invitar un usuario del panel (solo admin_cadena; email único global)"
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, role]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                role: { type: string, enum: [recepcion, profesional, admin_sede, admin_cadena] }
+                location_id: { type: [integer, "null"], description: "Obligatoria salvo para admin_cadena" }
+      responses:
+        "201": { description: Creado }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { description: "EMAIL_TAKEN" }
+
+  /api/v1/admin/users/{id}:
+    patch:
+      tags: [Panel]
+      summary: "Editar rol/sede/activo de un usuario (solo admin_cadena)"
+      description: "Desactivar revoca sus sesiones abiertas. Autoprotección: no puedes desactivarte ni cambiar tu propio rol."
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                role: { type: string, enum: [recepcion, profesional, admin_sede, admin_cadena] }
+                location_id: { type: [integer, "null"] }
+                active: { type: boolean }
+      responses:
+        "200": { description: Actualizado }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
   /api/v1/admin/reviews:
     get:
       tags: [Panel]
