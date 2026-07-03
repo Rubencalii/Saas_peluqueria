@@ -39,6 +39,17 @@ export interface LoginResponse {
   user: PanelUser;
 }
 
+export interface SignupInput {
+  business_name: string;
+  slug: string;
+  admin: { name: string; email: string; password: string };
+  location: { name: string; slug?: string; timezone?: string };
+}
+
+export interface SignupResponse extends LoginResponse {
+  account: { id: number; slug: string };
+}
+
 export interface AdminLocation {
   id: number;
   name: string;
@@ -353,6 +364,13 @@ async function adminFetch<T>(path: string, opts: { method?: string; body?: unkno
 export const admin = {
   login: (email: string, password: string) =>
     adminFetch<LoginResponse>("/api/v1/auth/login", { method: "POST", body: { email, password } }),
+
+  signup: (body: SignupInput) => adminFetch<SignupResponse>("/api/v1/signup", { method: "POST", body }),
+
+  forgotPassword: (email: string) =>
+    adminFetch<{ ok: boolean }>("/api/v1/auth/password/forgot", { method: "POST", body: { email } }),
+  resetPassword: (token: string, password: string) =>
+    adminFetch<{ ok: boolean }>("/api/v1/auth/password/reset", { method: "POST", body: { token, password } }),
 
   me: () => adminFetch<{ user: PanelUser }>("/api/v1/admin/me"),
 

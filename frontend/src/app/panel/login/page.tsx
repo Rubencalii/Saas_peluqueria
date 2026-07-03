@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { admin, setToken } from "@/lib/admin";
 
@@ -68,7 +69,20 @@ export default function PanelLogin() {
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading ? "Entrando…" : "Entrar"}
           </button>
+
+          <p className="text-center text-sm">
+            <Link href="/recuperar-contrasena" className="text-muted underline-offset-2 hover:text-foreground hover:underline">
+              ¿Has olvidado tu contraseña?
+            </Link>
+          </p>
         </form>
+
+        <p className="mt-4 text-center text-sm text-muted">
+          ¿Aún no tienes cuenta?{" "}
+          <Link href="/alta" className="font-medium text-foreground underline-offset-2 hover:underline">
+            Crea tu salón gratis
+          </Link>
+        </p>
       </div>
     </div>
   );
