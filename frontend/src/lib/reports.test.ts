@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reportCsvRows, type ReportBundle } from "./reports";
+import { pctDelta, ppDelta, previousRange, reportCsvRows, type ReportBundle } from "./reports";
 import type { ReportChannel, ReportOccupancy, ReportPeak, ReportRevenue } from "./admin";
 
 type Cell = string | number | null;
@@ -77,5 +77,43 @@ describe("reportCsvRows", () => {
     const rows = reportCsvRows(bundle({ revenue }));
     expect(hasRow(rows, ["Ocupación (%)", ""])).toBe(false);
     expect(hasRow(rows, ["Horas punta", "Hora", "Citas"])).toBe(false);
+  });
+});
+
+describe("previousRange", () => {
+  it("devuelve el rango anterior de la misma duración", () => {
+    expect(previousRange("2026-06-01", "2026-06-30")).toEqual({ from: "2026-05-02", to: "2026-05-31" });
+  });
+
+  it("funciona con un solo día", () => {
+    expect(previousRange("2026-07-03", "2026-07-03")).toEqual({ from: "2026-07-02", to: "2026-07-02" });
+  });
+
+  it("cruza el cambio de año", () => {
+    expect(previousRange("2026-01-01", "2026-01-07")).toEqual({ from: "2025-12-25", to: "2025-12-31" });
+  });
+
+  it("rechaza rangos inválidos", () => {
+    expect(previousRange("2026-06-30", "2026-06-01")).toBeNull();
+    expect(previousRange("mal", "2026-06-01")).toBeNull();
+  });
+});
+
+describe("deltas", () => {
+  it("pctDelta calcula la variación relativa", () => {
+    expect(pctDelta(120, 100)).toBeCloseTo(0.2);
+    expect(pctDelta(80, 100)).toBeCloseTo(-0.2);
+  });
+
+  it("pctDelta devuelve null sin base de comparación", () => {
+    expect(pctDelta(120, 0)).toBeNull();
+    expect(pctDelta(120, null)).toBeNull();
+    expect(pctDelta(null, 100)).toBeNull();
+  });
+
+  it("ppDelta devuelve puntos porcentuales entre tasas", () => {
+    expect(ppDelta(0.15, 0.1)).toBeCloseTo(5);
+    expect(ppDelta(0.1, 0.15)).toBeCloseTo(-5);
+    expect(ppDelta(null, 0.1)).toBeNull();
   });
 });

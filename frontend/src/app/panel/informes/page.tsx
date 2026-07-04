@@ -14,7 +14,14 @@ import {
 } from "@/lib/admin";
 import { formatPrice } from "@/lib/format";
 import { downloadCsv, toCsv } from "@/lib/csv";
-import { reportCsvRows } from "@/lib/reports";
+import { pctDelta, ppDelta, previousRange, reportCsvRows } from "@/lib/reports";
+
+interface PrevKpis {
+  revenue: ReportRevenue | null;
+  noShows: ReportNoShows | null;
+  retention: ReportRetention | null;
+  ratings: ReportRatings | null;
+}
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -43,6 +50,7 @@ export default function InformesPage() {
   const [ratings, setRatings] = useState<ReportRatings | null>(null);
   const [occupancy, setOccupancy] = useState<ReportOccupancy | null>(null);
   const [peak, setPeak] = useState<ReportPeak | null>(null);
+  const [prev, setPrev] = useState<PrevKpis | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,18 +60,26 @@ export default function InformesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const scope = { location_id: locationId, from, to };
-    const [rev, ch, ns, ret, rat] = await Promise.all([
+    // Mismo rango justo anterior, para dar contexto a los KPIs (¿mejor o peor?).
+    const prevRange = previousRange(from, to);
+    const prevScope = prevRange ? { location_id: locationId, from: prevRange.from, to: prevRange.to } : null;
+    const [rev, ch, ns, ret, rat, pRev, pNs, pRet, pRat] = await Promise.all([
       admin.reportRevenue(scope).catch(() => null),
       admin.reportChannel(scope).catch(() => null),
       admin.reportNoShows(scope).catch(() => null),
       admin.reportRetention(scope).catch(() => null),
       admin.reportRatings(scope).catch(() => null),
+      prevScope ? admin.reportRevenue(prevScope).catch(() => null) : Promise.resolve(null),
+      prevScope ? admin.reportNoShows(prevScope).catch(() => null) : Promise.resolve(null),
+      prevScope ? admin.reportRetention(prevScope).catch(() => null) : Promise.resolve(null),
+      prevScope ? admin.reportRatings(prevScope).catch(() => null) : Promise.resolve(null),
     ]);
     setRevenue(rev);
     setChannel(ch);
     setNoShows(ns);
     setRetention(ret);
     setRatings(rat);
+    setPrev(prevScope ? { revenue: pRev, noShows: pNs, retention: pRet, ratings: pRat } : null);
     // Ocupación y horas punta requieren una sede concreta.
     if (locationId) {
       const [occ, pk] = await Promise.all([
@@ -128,10 +144,44 @@ export default function InformesPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Kpi label="Ingresos" value={revenue ? formatPrice(revenue.total_revenue) : "—"} />
-            <Kpi label="Tasa de no-show" value={noShows ? pct(noShows.no_show_rate) : "—"} />
-            <Kpi label="Retención" value={retention ? pct(retention.retention_rate) : "—"} />
-            <Kpi label="Valoración media" value={ratings && ratings.count > 0 ? `${ratings.average.toFixed(2)} ★` : "—"} />
+            <Kpi
+              label="Ingresos"
+              value={revenue ? formatPrice(revenue.total_revenue) : "—"}
+              delta={fmtDelta(
+                prev ? pctDelta(revenue?.total_revenue ?? null, prev.revenue?.total_revenue ?? null) : null,
+                "%",
+                true,
+              )}
+            />
+            <Kpi
+              label="Tasa de no-show"
+              value={noShows ? pct(noShows.no_show_rate) : "—"}
+              delta={fmtDelta(
+                prev ? ppDelta(noShows?.no_show_rate ?? null, prev.noShows?.no_show_rate ?? null) : null,
+                "pp",
+                false,
+              )}
+            />
+            <Kpi
+              label="Retención"
+              value={retention ? pct(retention.retention_rate) : "—"}
+              delta={fmtDelta(
+                prev ? ppDelta(retention?.retention_rate ?? null, prev.retention?.retention_rate ?? null) : null,
+                "pp",
+                true,
+              )}
+            />
+            <Kpi
+              label="Valoración media"
+              value={ratings && ratings.count > 0 ? `${ratings.average.toFixed(2)} ★` : "—"}
+              delta={fmtDelta(
+                prev && ratings && ratings.count > 0 && prev.ratings && prev.ratings.count > 0
+                  ? ratings.average - prev.ratings.average
+                  : null,
+                "★",
+                true,
+              )}
+            />
           </div>
 
           {channel ? (
@@ -202,11 +252,47 @@ export default function InformesPage() {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+/**
+ * Línea de comparación con el periodo anterior: "%": variación relativa
+ * (0.12 → +12.0 %), "pp": puntos porcentuales, "★": diferencia absoluta.
+ * goodWhenUp indica si subir es bueno (ingresos) o malo (no-shows).
+ */
+function fmtDelta(
+  value: number | null,
+  unit: "%" | "pp" | "★",
+  goodWhenUp: boolean,
+): { text: string; good: boolean | null } | null {
+  if (value === null) return null;
+  const n = unit === "%" ? value * 100 : value;
+  if (Math.abs(n) < 0.05) return { text: "• igual que el periodo anterior", good: null };
+  const arrow = n > 0 ? "▲" : "▼";
+  const text = `${arrow} ${n > 0 ? "+" : ""}${n.toFixed(1)} ${unit} vs anterior`;
+  return { text, good: goodWhenUp ? n > 0 : n < 0 };
+}
+
+function Kpi({
+  label,
+  value,
+  delta,
+}: {
+  label: string;
+  value: string;
+  delta?: { text: string; good: boolean | null } | null;
+}) {
   return (
     <div className="card p-4">
       <p className="text-2xl font-bold">{value}</p>
       <p className="text-xs text-muted">{label}</p>
+      {delta ? (
+        <p
+          className={
+            "mt-1 text-xs font-medium " +
+            (delta.good === null ? "text-muted" : delta.good ? "text-emerald-700" : "text-red-700")
+          }
+        >
+          {delta.text}
+        </p>
+      ) : null}
     </div>
   );
 }

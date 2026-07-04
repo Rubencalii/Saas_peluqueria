@@ -14,6 +14,35 @@ import type {
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
+const DAY_MS = 86400000;
+
+/**
+ * Rango inmediatamente anterior de la misma duración (ambos inclusive):
+ * 2026-06-01..2026-06-30 → 2026-05-02..2026-05-31. null si el rango es inválido.
+ */
+export function previousRange(from: string, to: string): { from: string; to: string } | null {
+  const f = Date.parse(from + "T12:00:00Z");
+  const t = Date.parse(to + "T12:00:00Z");
+  if (Number.isNaN(f) || Number.isNaN(t) || t < f) return null;
+  const days = Math.round((t - f) / DAY_MS) + 1;
+  const prevTo = f - DAY_MS;
+  const prevFrom = prevTo - (days - 1) * DAY_MS;
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  return { from: iso(prevFrom), to: iso(prevTo) };
+}
+
+/** Variación relativa (0.12 = +12 %). null si falta alguno o el anterior es 0. */
+export function pctDelta(current: number | null, previous: number | null): number | null {
+  if (current === null || previous === null || previous === 0) return null;
+  return (current - previous) / previous;
+}
+
+/** Diferencia en puntos porcentuales entre tasas 0..1. null si falta alguna. */
+export function ppDelta(current: number | null, previous: number | null): number | null {
+  if (current === null || previous === null) return null;
+  return (current - previous) * 100;
+}
+
 export interface ReportBundle {
   from: string;
   to: string;
