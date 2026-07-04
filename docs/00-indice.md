@@ -29,6 +29,7 @@ Conjunto de documentos de partida para construir una plataforma de reservas con:
 | 13 | **Funcionalidades adicionales (backlog)** | Mejoras futuras y su priorización |
 | 14 | **Estado del backend** | Inventario de lo implementado y backlog técnico (actualizado) |
 | 15 | **Plan multi-tenant + suscripciones** | Diseño por fases para convertirlo en SaaS multi-salón (no implementado) |
+| 16 | **Estado del proyecto y pendientes** | Por dónde vamos y lo que queda; cómo verificar y convenciones (actualizado) |
 
 ---
 
