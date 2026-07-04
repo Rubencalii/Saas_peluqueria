@@ -395,6 +395,23 @@ export function clearToken(): void {
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
+/**
+ * Cuándo caduca un JWT del panel, en milisegundos de época (claim exp).
+ * null si el token no es decodificable. Solo lee el payload: la validez
+ * real la decide el backend.
+ */
+export function tokenExpiresAt(token: string): number | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const payload: unknown = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const exp = (payload as { exp?: unknown }).exp;
+    return typeof exp === "number" ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 function reportQuery(s: ReportScope): string {
   const q = new URLSearchParams({ from: s.from, to: s.to });
   if (s.location_id) q.set("location_id", String(s.location_id));
@@ -439,6 +456,8 @@ export const admin = {
     adminFetch<{ ok: boolean }>("/api/v1/auth/password/reset", { method: "POST", body: { token, password } }),
 
   me: () => adminFetch<{ user: PanelUser }>("/api/v1/admin/me"),
+
+  refresh: () => adminFetch<LoginResponse>("/api/v1/auth/refresh", { method: "POST" }),
 
   logout: () => adminFetch<{ ok: boolean }>("/api/v1/admin/auth/logout", { method: "POST" }),
 

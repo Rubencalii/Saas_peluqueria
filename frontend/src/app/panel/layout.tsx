@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { admin, clearToken, getToken, setToken, type PanelUser } from "@/lib/admin";
+import { admin, clearToken, getToken, setToken, tokenExpiresAt, type PanelUser } from "@/lib/admin";
 import { brandName, brandVars, type Branding } from "@/lib/theme";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -67,6 +67,16 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
       .catch(() => {
         // adminFetch ya redirige en 401.
       });
+    // Sesión deslizante: si al token le queda menos de la mitad de vida
+    // (TTL 8 h), se renueva en segundo plano para no expulsar a quien trabaja.
+    const token = getToken();
+    const exp = token ? tokenExpiresAt(token) : null;
+    if (exp !== null && exp - Date.now() < 4 * 3_600_000) {
+      admin
+        .refresh()
+        .then((r) => setToken(r.token))
+        .catch(() => {});
+    }
     admin
       .branding()
       .then((r) => setBranding(r.branding))
