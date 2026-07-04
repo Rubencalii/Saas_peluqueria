@@ -44,12 +44,32 @@ export default function AgendaPage() {
   const [myStaffId, setMyStaffId] = useState<number | null>(null);
   const [onlyMine, setOnlyMine] = useState(false);
 
+  // Prefill por URL (desde la lista de espera u otros accesos directos):
+  // /panel/agenda?nueva=1&location_id&service_id&date&name&phone
+  const [urlPrefill, setUrlPrefill] = useState<{ serviceId?: number; name?: string; phone?: string } | null>(null);
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("nueva") !== "1") return;
+    setUrlPrefill({
+      serviceId: q.get("service_id") ? Number(q.get("service_id")) : undefined,
+      name: q.get("name") ?? undefined,
+      phone: q.get("phone") ?? undefined,
+    });
+    const loc = q.get("location_id");
+    if (loc) setLocationId(Number(loc));
+    const d = q.get("date");
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) setDate(d);
+    setCreating(true);
+  }, []);
+
   useEffect(() => {
     admin
       .locations()
       .then((r) => {
         setLocations(r.locations);
-        if (r.locations.length > 0) setLocationId(r.locations[0].id);
+        // Conserva la sede si ya vino fijada (p. ej. por la URL).
+        if (r.locations.length > 0) setLocationId((cur) => cur ?? r.locations[0].id);
       })
       .catch(() => setError("No se pudieron cargar las sedes."));
     admin
@@ -146,6 +166,7 @@ export default function AgendaPage() {
           date={date}
           tz={tz}
           prefill={prefill}
+          initial={urlPrefill}
           services={services.filter((s) => s.active && s.locations.some((o) => o.location_id === locationId))}
           onClose={() => { setCreating(false); setPrefill(null); }}
           onCreated={async (d) => {
@@ -348,6 +369,7 @@ function NewAppointment({
   tz,
   services,
   prefill,
+  initial,
   onClose,
   onCreated,
 }: {
@@ -356,10 +378,12 @@ function NewAppointment({
   tz: string;
   services: AdminService[];
   prefill: NewApptPrefill | null;
+  /** Datos sueltos para prerrellenar (p. ej. desde la lista de espera). */
+  initial?: { serviceId?: number; name?: string; phone?: string } | null;
   onClose: () => void;
   onCreated: (date: string) => void;
 }) {
-  const [serviceId, setServiceId] = useState<number | "">(prefill?.serviceId ?? "");
+  const [serviceId, setServiceId] = useState<number | "">(prefill?.serviceId ?? initial?.serviceId ?? "");
   const [date, setDate] = useState(prefill?.date ?? agendaDate);
   const [slots, setSlots] = useState<Array<{ start: string; staff_id: number }> | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -367,8 +391,8 @@ function NewAppointment({
   // El prefill viene de "Próximo hueco": preselecciona el hueco una sola vez,
   // cuando llega la disponibilidad del día (el efecto resetea slot al cargar).
   const prefillApplied = useRef(false);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

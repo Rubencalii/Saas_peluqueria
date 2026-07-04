@@ -273,6 +273,42 @@ final class AdminPanelExtraTest extends WebTestCase
         self::assertNull($adminMe['user']['staff_id']);
     }
 
+    public function testInformeMensualDevuelveDoceMesesCompletos(): void
+    {
+        $token = $this->login();
+        $data = $this->getJson('/api/v1/admin/reports/monthly', $token);
+
+        self::assertCount(12, $data['months']);
+        $current = (new \DateTimeImmutable('now'))->format('Y-m');
+        self::assertSame($current, $data['months'][11]['month'], 'El último mes es el actual.');
+        foreach ($data['months'] as $m) {
+            self::assertMatchesRegularExpression('/^\d{4}-\d{2}$/', $m['month']);
+            self::assertArrayHasKey('appointments', $m);
+            self::assertArrayHasKey('revenue', $m);
+        }
+    }
+
+    public function testConvertirEntradaDeListaDeEspera(): void
+    {
+        $token = $this->login();
+        $customerId = (int) $this->db->fetchOne(
+            "INSERT INTO customer (account_id, name, phone) VALUES (1, 'Espera Convertible', '+34600777666') RETURNING id"
+        );
+        $entryId = (int) $this->db->fetchOne(
+            "INSERT INTO waitlist (location_id, service_id, customer_id, status) VALUES (1, 2, ?, 'esperando') RETURNING id",
+            [$customerId]
+        );
+
+        // Convertir cierra la espera…
+        $this->client->request('POST', "/api/v1/admin/waitlist/{$entryId}/convert", server: $this->auth($token));
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        self::assertSame('convertido', $this->db->fetchOne('SELECT status FROM waitlist WHERE id = ?', [$entryId]));
+
+        // …y no se puede convertir dos veces.
+        $this->client->request('POST', "/api/v1/admin/waitlist/{$entryId}/convert", server: $this->auth($token));
+        self::assertSame(409, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testCortaElPanelConSecretoInseguroEnHostNoLocal(): void
     {
         // En test el APP_SECRET es un placeholder inseguro: desde un host NO local

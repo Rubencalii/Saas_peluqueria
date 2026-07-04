@@ -325,6 +325,12 @@ export interface ReportPeak {
   slots: Array<{ weekday: number; hour: number; appointments: number }>;
 }
 
+export interface MonthlyPoint {
+  month: string; // YYYY-MM
+  appointments: number;
+  revenue: number;
+}
+
 export interface PanelTeamUser {
   id: number;
   name: string;
@@ -560,6 +566,10 @@ export const admin = {
   reportRatings: (s: ReportScope) => adminFetch<ReportRatings>(`/api/v1/admin/reports/ratings?${reportQuery(s)}`),
   reportOccupancy: (s: ReportScope) => adminFetch<ReportOccupancy>(`/api/v1/admin/reports/occupancy?${reportQuery(s)}`),
   reportPeak: (s: ReportScope) => adminFetch<ReportPeak>(`/api/v1/admin/reports/peak-hours?${reportQuery(s)}`),
+  reportMonthly: (locationId: number | null) =>
+    adminFetch<{ months: MonthlyPoint[] }>(
+      `/api/v1/admin/reports/monthly${locationId ? `?location_id=${locationId}` : ""}`,
+    ),
 
   conversations: (status: "pendiente" | "all", page: number) =>
     adminFetch<ConversationList>(`/api/v1/admin/conversations?status=${status}&page=${page}&per_page=20`),
@@ -575,6 +585,8 @@ export const admin = {
     return adminFetch<WaitlistList>(`/api/v1/admin/waitlist?${q.toString()}`);
   },
   cancelWaitlist: (id: number) => adminFetch<{ ok: boolean }>(`/api/v1/admin/waitlist/${id}`, { method: "DELETE" }),
+  convertWaitlist: (id: number) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/waitlist/${id}/convert`, { method: "POST" }),
 
   reviews: (locationId: number | null, page: number) => {
     const q = new URLSearchParams({ page: String(page), per_page: "20" });

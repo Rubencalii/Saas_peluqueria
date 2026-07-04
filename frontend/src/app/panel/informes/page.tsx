@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   admin,
   type AdminLocation,
+  type MonthlyPoint,
   type ReportChannel,
   type ReportOccupancy,
   type ReportPeak,
@@ -51,7 +52,16 @@ export default function InformesPage() {
   const [occupancy, setOccupancy] = useState<ReportOccupancy | null>(null);
   const [peak, setPeak] = useState<ReportPeak | null>(null);
   const [prev, setPrev] = useState<PrevKpis | null>(null);
+  const [monthly, setMonthly] = useState<MonthlyPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // La evolución de 12 meses solo depende de la sede, no del rango de fechas.
+  useEffect(() => {
+    admin
+      .reportMonthly(locationId)
+      .then((r) => setMonthly(r.months))
+      .catch(() => setMonthly(null));
+  }, [locationId]);
 
   useEffect(() => {
     admin.locations().then((r) => setLocations(r.locations)).catch(() => {});
@@ -184,6 +194,12 @@ export default function InformesPage() {
             />
           </div>
 
+          {monthly && monthly.some((m) => m.appointments > 0) ? (
+            <Section title="Evolución · últimos 12 meses">
+              <MonthlyChart data={monthly} />
+            </Section>
+          ) : null}
+
           {channel ? (
             <Section title="Reservas por canal">
               <div className="grid grid-cols-3 gap-3 text-center">
@@ -268,6 +284,36 @@ function fmtDelta(
   const arrow = n > 0 ? "▲" : "▼";
   const text = `${arrow} ${n > 0 ? "+" : ""}${n.toFixed(1)} ${unit} vs anterior`;
   return { text, good: goodWhenUp ? n > 0 : n < 0 };
+}
+
+/** Barras de ingresos por mes con el nº de citas encima. */
+function MonthlyChart({ data }: { data: MonthlyPoint[] }) {
+  const max = Math.max(1, ...data.map((m) => m.revenue));
+  return (
+    <div className="flex h-36 items-end gap-1.5 sm:gap-2">
+      {data.map((m) => (
+        <div
+          key={m.month}
+          className="flex flex-1 flex-col items-center gap-1"
+          title={`${m.month}: ${m.appointments} citas · ${formatPrice(m.revenue)}`}
+        >
+          <span className="text-[10px] font-semibold tabular-nums text-muted">
+            {m.appointments > 0 ? m.appointments : ""}
+          </span>
+          <div
+            className="w-full rounded-t-md transition"
+            style={{
+              height: `${Math.max(m.revenue > 0 ? 8 : 2, (m.revenue / max) * 96)}px`,
+              background: m.revenue > 0 ? "var(--brand)" : "var(--border)",
+            }}
+          />
+          <span className="text-[10px] capitalize text-muted">
+            {new Date(m.month + "-01T12:00:00").toLocaleDateString("es-ES", { month: "short" })}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function Kpi({

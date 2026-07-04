@@ -169,6 +169,18 @@ final class WaitlistService
         $this->db->executeStatement("UPDATE waitlist SET status = 'cancelado' WHERE id = ?", [$id]);
     }
 
+    /**
+     * Marca como convertida (el cliente ya tiene cita). Solo desde estados
+     * vivos; devuelve false si la entrada ya estaba cerrada.
+     */
+    public function markConverted(int $id): bool
+    {
+        return $this->db->executeStatement(
+            "UPDATE waitlist SET status = 'convertido' WHERE id = ? AND status IN ('esperando', 'avisado')",
+            [$id]
+        ) > 0;
+    }
+
     private function upsertCustomer(Connection $tx, int $accountId, string $name, string $phone, bool $waConsent): int
     {
         return (int) $tx->fetchOne(

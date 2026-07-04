@@ -54,6 +54,38 @@ final class AdminWaitlistController extends AdminController
         ]);
     }
 
+    /**
+     * Marca la entrada como convertida (el cliente ya tiene su cita). El alta
+     * de la cita en sí se hace en la agenda; esto cierra la espera.
+     */
+    #[Route('/api/v1/admin/waitlist/{id}/convert', name: 'admin_waitlist_convert', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function convert(int $id, Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        try {
+            $this->auth->assertRole($user, self::ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        $locationId = $this->waitlist->locationOf($id);
+        if ($locationId === null) {
+            return $this->error('NOT_FOUND', 'Entrada no encontrada.', 404);
+        }
+        try {
+            $this->auth->assertLocationAccount($user, $locationId);
+            $this->auth->assertLocation($user, $locationId);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        if (!$this->waitlist->markConverted($id)) {
+            return $this->error('INVALID_STATE', 'La entrada ya estaba cerrada (convertida o cancelada).', 409);
+        }
+
+        return $this->json(['ok' => true]);
+    }
+
     #[Route('/api/v1/admin/waitlist/{id}', name: 'admin_waitlist_cancel', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     public function cancel(int $id, Request $request): JsonResponse
     {

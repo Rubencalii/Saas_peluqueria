@@ -344,6 +344,53 @@ final class AdminReportsController extends AdminController
      *
      * @return array{0: string, 1: list<string|int>}
      */
+    /**
+     * Serie mensual (últimos 12 meses, incluido el actual): citas completadas
+     * e ingresos por mes, con los meses sin actividad a cero. Para la gráfica
+     * de evolución del panel.
+     */
+    #[Route('/api/v1/admin/reports/monthly', name: 'admin_report_monthly', methods: ['GET'])]
+    public function monthly(Request $request): JsonResponse
+    {
+        $ctx = $this->context($request, requireLocation: false);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
+        [$locationId, , , $tz, $accountId] = $ctx;
+
+        $from = (new \DateTimeImmutable('first day of this month 00:00', $tz))->modify('-11 months');
+        $to = new \DateTimeImmutable('first day of next month 00:00', $tz);
+        [$where, $params] = $this->scope($locationId, $accountId, $from, $to, 'a');
+        $where .= " AND a.status = 'completada'";
+
+        $price = 'COALESCE(sl.price_override, s.price)';
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT to_char(date_trunc('month', a.start_at AT TIME ZONE ?), 'YYYY-MM') AS month,
+                    COUNT(*) AS appts, COALESCE(SUM($price), 0) AS revenue
+               FROM appointment a
+               JOIN service s ON s.id = a.service_id
+               LEFT JOIN service_location sl ON sl.service_id = a.service_id AND sl.location_id = a.location_id
+              WHERE $where
+              GROUP BY 1 ORDER BY 1",
+            array_merge([$tz->getName()], $params)
+        );
+
+        // Serie completa: los meses sin datos también cuentan (a cero).
+        $series = [];
+        for ($m = $from; $m < $to; $m = $m->modify('+1 month')) {
+            $series[$m->format('Y-m')] = ['month' => $m->format('Y-m'), 'appointments' => 0, 'revenue' => 0.0];
+        }
+        foreach ($rows as $r) {
+            $key = (string) $r['month'];
+            if (isset($series[$key])) {
+                $series[$key]['appointments'] = (int) $r['appts'];
+                $series[$key]['revenue'] = round((float) $r['revenue'], 2);
+            }
+        }
+
+        return $this->json(['location_id' => $locationId, 'months' => array_values($series)]);
+    }
+
     private function scope(?int $locationId, int $accountId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $alias = ''): array
     {
         $p = $alias !== '' ? $alias . '.' : '';

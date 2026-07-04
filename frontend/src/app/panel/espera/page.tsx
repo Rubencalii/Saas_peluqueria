@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { admin, type WaitlistList } from "@/lib/admin";
+import Link from "next/link";
+import { admin, type WaitlistItem, type WaitlistList } from "@/lib/admin";
 
 const STATUS: Record<string, string> = {
   esperando: "Esperando",
@@ -40,6 +41,24 @@ export default function EsperaPage() {
     await load();
   }
 
+  async function convert(id: number) {
+    await admin.convertWaitlist(id);
+    await load();
+  }
+
+  /** Abre la agenda con Nueva cita prerrellenada con los datos de la espera. */
+  function bookUrl(w: WaitlistItem): string {
+    const q = new URLSearchParams({
+      nueva: "1",
+      location_id: String(w.location.id),
+      service_id: String(w.service.id),
+      name: w.customer.name,
+      phone: w.customer.phone,
+    });
+    if (w.desired_date) q.set("date", w.desired_date);
+    return `/panel/agenda?${q.toString()}`;
+  }
+
   return (
     <div className="space-y-5">
       <header className="flex items-center justify-between gap-3">
@@ -74,9 +93,21 @@ export default function EsperaPage() {
                 </p>
               </div>
               {w.status === "esperando" || w.status === "avisado" ? (
-                <button onClick={() => cancel(w.id)} className="btn-ghost px-3 py-1.5 text-xs text-red-700 hover:border-red-300">
-                  Dar de baja
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <Link href={bookUrl(w)} className="btn-ghost px-3 py-1.5 text-xs">
+                    📅 Crear cita
+                  </Link>
+                  <button
+                    onClick={() => convert(w.id)}
+                    title="El cliente ya tiene cita: cierra la espera"
+                    className="btn-ghost px-3 py-1.5 text-xs"
+                  >
+                    ✓ Convertida
+                  </button>
+                  <button onClick={() => cancel(w.id)} className="btn-ghost px-3 py-1.5 text-xs text-red-700 hover:border-red-300">
+                    Dar de baja
+                  </button>
+                </div>
               ) : (
                 <span className="chip bg-brand-soft capitalize">{STATUS[w.status] ?? w.status}</span>
               )}
