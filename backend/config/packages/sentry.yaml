@@ -1,0 +1,22 @@
+# Monitorización de errores (doc 11 §7). Degrada como el resto de
+# integraciones: sin SENTRY_DSN el SDK queda desactivado y no envía nada.
+sentry:
+    dsn: '%env(SENTRY_DSN)%'
+    options:
+        environment: '%kernel.environment%'
+        # Solo errores; sin trazas de rendimiento (0 = desactivado).
+        traces_sample_rate: 0
+        # No enviar datos personales (cabeceras/IP) — RGPD (doc 09).
+        send_default_pii: false
+    # Los 4xx esperables (validación, auth, not found) ya los convierte en
+    # respuesta el ApiExceptionListener y no llegan aquí: a Sentry solo van
+    # errores reales de la plataforma.
+    register_error_listener: true
+
+when@dev:
+    sentry:
+        dsn: ''
+
+when@test:
+    sentry:
+        dsn: ''

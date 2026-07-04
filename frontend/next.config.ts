@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // La API del backend (Symfony). En el navegador llamamos a rutas relativas
 // `/api/...` que Next reescribe al backend → mismo origen, sin CORS en dev.
@@ -43,4 +44,12 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry (monitorización de errores). Sin DSN el SDK queda desactivado; el
+// túnel /monitoring hace que el navegador envíe al mismo origen (CSP intacta).
+// Sin SENTRY_AUTH_TOKEN no se suben sourcemaps (aviso silenciado): correcto
+// en local/CI; en producción puede añadirse el token para stack traces legibles.
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  tunnelRoute: "/monitoring",
+  disableLogger: true,
+});

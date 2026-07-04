@@ -67,9 +67,12 @@ services:
       context: ./frontend
       args:
         API_BASE: "http://backend"
+        # Sentry del navegador (opcional): vacío = desactivado.
+        NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN_FRONTEND:-}
     restart: unless-stopped
     environment:
       API_BASE: "http://backend"
+      NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN_FRONTEND:-}
     depends_on:
       - backend
 

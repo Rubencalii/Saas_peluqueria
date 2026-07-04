@@ -14,7 +14,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG API_BASE=http://backend
-ENV API_BASE=$API_BASE NEXT_OUTPUT=standalone NEXT_TELEMETRY_DISABLED=1
+# DSN de Sentry del navegador: se incrusta en el build (vacío = desactivado).
+ARG NEXT_PUBLIC_SENTRY_DSN=""
+ENV API_BASE=$API_BASE NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
+    NEXT_OUTPUT=standalone NEXT_TELEMETRY_DISABLED=1
 # public/ está vacío en el repo (git no guarda carpetas vacías): asegúrala.
 RUN mkdir -p public && npm run build
 
