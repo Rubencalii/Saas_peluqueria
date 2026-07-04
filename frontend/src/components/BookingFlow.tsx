@@ -126,14 +126,14 @@ export function BookingFlow({
 
   if (step === "done" && result) {
     return (
-      <div className="card overflow-hidden p-8 text-center">
+      <div className="card fade-up overflow-hidden p-8 text-center">
         <div
-          className="mx-auto grid h-16 w-16 place-items-center rounded-full text-3xl text-white"
-          style={{ background: "var(--accent)" }}
+          className="pop-in mx-auto grid h-16 w-16 place-items-center rounded-full text-3xl text-white"
+          style={{ background: "var(--accent)", boxShadow: "0 12px 30px -12px var(--accent)" }}
         >
           ✓
         </div>
-        <h2 className="mt-4 text-2xl font-bold">¡Cita confirmada!</h2>
+        <h2 className="font-display mt-4 text-3xl font-bold">¡Cita confirmada!</h2>
         <p className="mt-1 text-muted">{capitalize(formatDateLong(result.start, timeZone))}</p>
         <p className="text-xl font-semibold">{formatTime(result.start, timeZone)} h</p>
         <div className="mx-auto mt-5 max-w-sm rounded-2xl bg-brand-soft p-4 text-sm">

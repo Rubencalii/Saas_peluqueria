@@ -52,15 +52,15 @@ export default function AltaPage() {
 
   return (
     <div className="grid min-h-screen place-items-center px-4 py-8">
-      <div className="w-full max-w-md">
+      <div className="fade-up w-full max-w-md">
         <div className="mb-6 text-center">
           <span
             className="mx-auto grid h-12 w-12 place-items-center rounded-2xl text-2xl text-brand-ink"
-            style={{ background: "var(--brand)" }}
+            style={{ background: "var(--brand)", boxShadow: "0 10px 24px -10px var(--brand)" }}
           >
             ✂️
           </span>
-          <h1 className="mt-3 text-2xl font-bold tracking-tight">Crea tu cuenta</h1>
+          <h1 className="font-display mt-3 text-3xl font-bold tracking-tight">Crea tu cuenta</h1>
           <p className="mt-1 text-sm text-muted">
             Tu salón con reservas online y WhatsApp en un minuto. Sin tarjeta.
           </p>

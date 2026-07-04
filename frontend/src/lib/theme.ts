@@ -81,3 +81,27 @@ export function brandCss(branding: Branding | null | undefined): string {
 export function brandName(branding: Branding | null | undefined, fallback = "Reservas"): string {
   return branding?.display_name?.trim() || branding?.name?.trim() || fallback;
 }
+
+/** Luminancia relativa WCAG (0 negro … 1 blanco). */
+function luminance({ r, g, b }: Rgb): number {
+  const f = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+/**
+ * Ratio de contraste WCAG entre dos colores hex (1..21). null si algún color
+ * no es un hex válido. Sirve para avisar en el editor de apariencia cuando la
+ * marca elegida pierde presencia o legibilidad.
+ */
+export function contrastRatio(hexA: string, hexB: string): number | null {
+  const a = parseHex(hexA);
+  const b = parseHex(hexB);
+  if (!a || !b) return null;
+  const la = luminance(a);
+  const lb = luminance(b);
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}

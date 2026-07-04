@@ -20,24 +20,35 @@ export default async function Home() {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-[var(--radius-brand)] border border-border bg-card p-8 shadow-[var(--shadow-soft)]">
+      <section className="fade-up relative overflow-hidden rounded-[var(--radius-brand)] border border-border bg-card p-8 shadow-[var(--shadow-soft)]">
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full opacity-60 blur-2xl"
+          className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full opacity-70 blur-2xl"
           style={{ background: "var(--brand-soft)" }}
         />
-        <p className="chip bg-brand-soft text-brand-strong">Reserva en 1 minuto</p>
-        <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-20 -left-12 h-44 w-44 rounded-full opacity-50 blur-3xl"
+          style={{ background: "var(--accent-soft, var(--brand-soft))" }}
+        />
+        <p className="chip bg-brand-soft text-brand-strong">✨ Reserva en 1 minuto</p>
+        <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl">
           Tu próxima cita,
-          <br className="hidden sm:block" /> sin llamadas ni esperas.
+          <br className="hidden sm:block" />{" "}
+          <span
+            className="bg-clip-text text-transparent"
+            style={{ backgroundImage: "linear-gradient(90deg, var(--brand), var(--accent))" }}
+          >
+            sin llamadas ni esperas.
+          </span>
         </h1>
-        <p className="mt-3 max-w-md text-muted">
+        <p className="mt-4 max-w-md text-muted">
           Elige tu salón, el servicio y la hora que mejor te venga. Te confirmamos al instante por
           WhatsApp.
         </p>
       </section>
 
-      <section>
+      <section className="fade-up" style={{ animationDelay: "80ms" }}>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           Elige tu salón
         </h2>

@@ -113,7 +113,9 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
                 aria-current={active ? "page" : undefined}
                 className={
                   "flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition " +
-                  (active ? "bg-brand-soft text-foreground" : "text-muted hover:bg-brand-soft/60")
+                  (active
+                    ? "bg-brand-soft text-foreground shadow-[inset_3px_0_0_0_var(--brand)]"
+                    : "text-muted hover:bg-brand-soft/60 hover:text-foreground")
                 }
               >
                 <span>{item.icon}</span>

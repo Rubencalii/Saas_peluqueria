@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { brandCss, brandName, brandVars, type Branding } from "./theme";
+import { brandCss, brandName, brandVars, contrastRatio, type Branding } from "./theme";
 
 function b(over: Partial<Branding>): Branding {
   return { name: "Salón", display_name: null, brand_color: null, accent_color: null, logo_url: null, ...over };
@@ -50,5 +50,21 @@ describe("brandCss", () => {
   it("envuelve las variables en :root{}", () => {
     expect(brandCss(b({ brand_color: "#000000" }))).toContain(":root{--brand:#000000;");
     expect(brandCss(b({}))).toBe("");
+  });
+});
+
+describe("contrastRatio", () => {
+  it("blanco sobre negro es el máximo (21)", () => {
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 0);
+  });
+
+  it("un color consigo mismo es 1 y es simétrico", () => {
+    expect(contrastRatio("#a96f43", "#a96f43")).toBeCloseTo(1, 5);
+    expect(contrastRatio("#a96f43", "#fbf8f4")).toBeCloseTo(contrastRatio("#fbf8f4", "#a96f43") ?? 0, 5);
+  });
+
+  it("devuelve null con hex inválido", () => {
+    expect(contrastRatio("rojo", "#ffffff")).toBeNull();
+    expect(contrastRatio("#fff", "#ffffff")).toBeNull(); // exige 6 dígitos
   });
 });
