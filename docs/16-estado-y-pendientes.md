@@ -1,6 +1,6 @@
 # 16 · Estado del proyecto y pendientes
 
-> Última actualización: **2026-07-03** · Rama: `main` (todo lo listado como "hecho" está commiteado y en verde)
+> Última actualización: **2026-07-04** · Rama: `main` (todo lo listado como "hecho" está commiteado y en verde)
 > Objetivo del documento: retomar el trabajo rápido sabiendo **por dónde vamos y lo que queda**.
 
 ---
@@ -50,15 +50,24 @@
 
 ---
 
-## 3. Pendiente (por orden recomendado)
+## 3. Hecho también (2026-07-04, segunda tanda)
 
-1. **Hyper diseño del SaaS** *(en curso — petición del 2026-07-04)*: elevar el acabado visual de la web pública y el panel (sistema de diseño en `globals.css`: sombras, radios, foco, microinteracciones, dark mode) y **perfeccionar el editor de apariencia** (`/panel/apariencia`): vista previa en vivo, paletas predefinidas, aviso de contraste. Ojo: no renombrar clases que usa el E2E (`card-link`, `slot`, `font-mono`).
-2. **Monitorización de errores (Sentry)** en backend y frontend, con DSN por variable de entorno y degradación silenciosa sin él (patrón de las demás integraciones).
-3. **Backlog de producto** (sin compromiso, doc 13): bonos/packs y tarjetas regalo, multi-idioma (ca/en), SEO por salón (metadata/OG por slug), series temporales en informes, app del profesional (PWA).
+- ✅ **Hyper diseño**: sistema visual elevado (tipografía display, botones con degradado, fade-up/pop-in, skeletons con brillo, reduced-motion) y **editor de apariencia** con 8 paletas, hex editable, avisos de contraste WCAG y prueba en vivo en todo el panel.
+- ✅ **Sentry** back y front (túnel same-origin `/monitoring`, CSP intacta; desactivado sin DSN).
+- ✅ **Consola de plataforma** con identidad propia (`[data-console]`) y funcionalidades de operador: ficha de cuenta (contactos, sedes, suscripción/Stripe, actividad), **impersonación auditada**, aviso al cambiar plan gestionado por Stripe, altas/semana y buscador. Auditoría ampliada a `/api/v1/superadmin`.
+- ✅ **Sesión deslizante** (renueva el token antes de caducar), **2FA TOTP** (RFC 6238 propio, alta en dos pasos, baja protegida; página `/panel/seguridad`), **PWA** del panel (manifest + iconos), **E2E en CI** (tercer job), suite **sin deprecaciones**.
+- ✅ Producto: **evolución mensual** en informes (12 meses), **convertir lista de espera** (marcar convertida + crear cita prerrellenada por URL), **export CSV de clientes** (filtro de consentimiento) y **Open Graph** por salón.
+
+## 4. Pendiente
+
+1. **MRR real vía Stripe**: los planes no tienen precio local (solo `stripe_price_id`); calcularlo exige consultar la API de Stripe con credenciales. Mostrar en la consola cuando haya claves.
+2. **CD/staging**: CI testea (unit + E2E) pero no despliega; el runbook de `deploy/README.md` es manual. Requiere servidor y secretos.
+3. **Uptime externo con alertas** (Sentry captura errores; nadie avisa si el host cae). Servicio externo tipo UptimeRobot contra `/api/v1/health`.
+4. **Backlog de producto** (sin compromiso, doc 13): bonos/packs y tarjetas regalo, multi-idioma (ca/en), series temporales más ricas, app del profesional.
 
 ---
 
-## 4. Cómo verificar (antes de cada commit)
+## 5. Cómo verificar (antes de cada commit)
 
 ```bash
 # BD de desarrollo/test (puerto 5446)
@@ -75,7 +84,7 @@ npm run lint && npx vitest run && npx next build
 - Las 2 deprecaciones de PHPUnit (`setNestTransactionsWithSavepoints` de Doctrine DBAL) son **preexistentes y conocidas**; la suite se considera verde con ellas.
 - Si la BD no responde: el contenedor `peluqueria_db` se para a veces; `docker compose up -d` y esperar `pg_isready`.
 
-## 5. Convenciones del repo
+## 6. Convenciones del repo
 
 - Commits **sin marca de agua** ni Co-Authored-By; autor `Ruben <rubencorralromero2018@gmail.com>`; push directo a `main` tras verificar.
 - Secretos reales **solo** en `.env.local` (gitignorado); los `.env*` commiteados llevan placeholders.

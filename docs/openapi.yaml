@@ -228,10 +228,10 @@ paths:
       summary: Login del panel (devuelve JWT)
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string }, password: { type: string } } } } }
+        content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string }, password: { type: string }, totp_code: { type: string, description: "Obligatorio si el usuario tiene 2FA (401 TOTP_REQUIRED sin él)" } } } } }
       responses:
         "200": { description: Token + usuario, content: { application/json: { schema: { $ref: "#/components/schemas/LoginResponse" } } } }
-        "401": { $ref: "#/components/responses/Error" }
+        "401": { description: "INVALID_CREDENTIALS · TOTP_REQUIRED · TOTP_INVALID" }
         "429": { $ref: "#/components/responses/Error" }
 
   /api/v1/auth/refresh:
@@ -251,6 +251,37 @@ paths:
       responses:
         "200": { description: OK }
         "401": { $ref: "#/components/responses/Error" }
+
+  /api/v1/admin/2fa:
+    get:
+      tags: [Auth]
+      summary: "Estado del doble factor del propio usuario"
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: "{ enabled: bool }" } }
+  /api/v1/admin/2fa/setup:
+    post:
+      tags: [Auth]
+      summary: "Genera secreto TOTP + URI otpauth (no activa nada todavía)"
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: "{ secret, otpauth_uri }" } }
+  /api/v1/admin/2fa/enable:
+    post:
+      tags: [Auth]
+      summary: "Activa el 2FA confirmando un código válido del secreto"
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [secret, code], properties: { secret: { type: string }, code: { type: string } } } } }
+      responses: { "200": { description: Activado }, "400": { description: "TOTP_INVALID" } }
+  /api/v1/admin/2fa/disable:
+    post:
+      tags: [Auth]
+      summary: "Desactiva el 2FA (exige un código vigente: una sesión robada no basta)"
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string } } } } }
+      responses: { "200": { description: Desactivado }, "400": { description: "TOTP_INVALID" } }
 
   /api/v1/auth/verify-email:
     post:
@@ -358,6 +389,16 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
 
   /api/v1/superadmin/accounts/{id}:
+    get:
+      tags: [Panel]
+      summary: "Plataforma: ficha de una cuenta (admins con contacto, sedes, suscripción/Stripe, actividad)"
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Ficha }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
     patch:
       tags: [Panel]
       summary: "Plataforma: cambiar estado y/o plan de una cuenta (super-admin)"
@@ -377,6 +418,19 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+
+  /api/v1/superadmin/accounts/{id}/impersonate:
+    post:
+      tags: [Panel]
+      summary: "Plataforma: sesión del primer admin activo de la cuenta (soporte; queda auditado)"
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: "Token + usuario + cuenta" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { description: "NO_ADMIN: la cuenta no tiene administrador activo" }
 
   /api/v1/admin/billing/checkout:
     post:
@@ -661,6 +715,17 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses: { "200": { description: Cancelada } }
 
+  /api/v1/admin/waitlist/{id}/convert:
+    post:
+      tags: [Panel]
+      summary: "Marcar convertida (el cliente ya tiene cita; cierra la espera)"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200": { description: Convertida }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { description: "INVALID_STATE: ya estaba convertida o cancelada" }
+
   /api/v1/admin/reports/occupancy:
     get: { tags: [Panel], summary: "Ocupación (minutos reservados vs capacidad)", security: [{ bearerAuth: [] }], parameters: [{ name: location_id, in: query, schema: { type: integer } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }], responses: { "200": { description: Informe } } }
   /api/v1/admin/reports/no-shows:
@@ -675,6 +740,8 @@ paths:
     get: { tags: [Panel], summary: "Tasa de retención", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
   /api/v1/admin/reports/no-show-customers:
     get: { tags: [Panel], summary: "Clientes con más ausencias", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+  /api/v1/admin/reports/monthly:
+    get: { tags: [Panel], summary: "Evolución mensual (últimos 12 meses; citas completadas e ingresos, meses vacíos a cero)", security: [{ bearerAuth: [] }], parameters: [{ name: location_id, in: query, schema: { type: integer } }], responses: { "200": { description: "{ months: [{ month, appointments, revenue }] }" } } }
 
   /api/v1/admin/audit:
     get:
