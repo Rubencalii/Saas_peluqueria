@@ -14,6 +14,7 @@ const PLANS = ["free", "pro", "cadena"];
 export default function SuperAdminHome() {
   const [stats, setStats] = useState<SaStats | null>(null);
   const [accounts, setAccounts] = useState<SaAccount[]>([]);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -50,13 +51,26 @@ export default function SuperAdminHome() {
     );
   }
 
+  const shown = accounts.filter((a) => {
+    const q = query.trim().toLowerCase();
+    return q === "" || a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q);
+  });
+
   return (
     <div className="fade-up space-y-6">
-      <header>
-        <h1 className="font-display text-3xl font-bold tracking-tight">Cuentas de la plataforma</h1>
-        <p className="mt-1 text-sm text-muted">
-          Todos los salones del SaaS: su plan, su uso y su estado. Suspender deja la cuenta en solo lectura.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Cuentas de la plataforma</h1>
+          <p className="mt-1 text-sm text-muted">
+            Todos los salones del SaaS: su plan, su uso y su estado. Suspender deja la cuenta en solo lectura.
+          </p>
+        </div>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar cuenta o slug…"
+          className="field mt-0 w-64"
+        />
       </header>
 
       {stats ? (
@@ -81,7 +95,14 @@ export default function SuperAdminHome() {
             </tr>
           </thead>
           <tbody>
-            {accounts.map((a) => {
+            {shown.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
+                  Ninguna cuenta encaja con «{query}».
+                </td>
+              </tr>
+            ) : null}
+            {shown.map((a) => {
               const st = STATUS[a.status] ?? { label: a.status, cls: "bg-zinc-200 text-zinc-600" };
               const suspended = a.status === "suspended" || a.status === "cancelled";
               return (

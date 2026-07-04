@@ -1,9 +1,13 @@
 "use client";
 
+// Consola de plataforma: la zona del DUEÑO DEL SAAS, no de un salón. Identidad
+// propia (tema [data-console] en globals.css): índigo sobre neutros fríos,
+// sin la marca del salón, para que nunca se confunda con el panel.
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { admin, clearToken, getToken, type PanelUser } from "@/lib/admin";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -48,26 +52,45 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border bg-foreground text-[var(--background)]">
+    <div data-console className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-20 border-b border-[#262b36] bg-[#12141c] text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
-          <span className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--background)] text-foreground">⚙️</span>
-            Plataforma
+          <span className="flex items-center gap-2.5 font-semibold tracking-tight">
+            <span
+              className="grid h-8 w-8 place-items-center rounded-lg text-base"
+              style={{ background: "linear-gradient(135deg, #6366f1, #4338ca)" }}
+            >
+              ⚙️
+            </span>
+            <span>
+              Consola de plataforma
+              <span className="ml-2 rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/70">
+                superadmin
+              </span>
+            </span>
           </span>
-          <div className="flex items-center gap-3 text-sm">
-            <Link href="/panel" className="opacity-80 hover:opacity-100">
-              Panel
+          <div className="flex items-center gap-2 text-sm">
+            <ThemeToggle />
+            <Link
+              href="/panel"
+              className="rounded-full px-3 py-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+            >
+              ← Panel del salón
             </Link>
-            <span className="opacity-50">·</span>
-            <span className="opacity-80">{user?.name}</span>
-            <button onClick={logout} className="rounded-full bg-[var(--background)]/15 px-3 py-1 hover:bg-[var(--background)]/25">
+            <span className="hidden text-white/50 sm:inline">{user?.name}</span>
+            <button
+              onClick={logout}
+              className="rounded-full bg-white/10 px-3 py-1.5 font-medium transition hover:bg-white/20"
+            >
               Salir
             </button>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-5 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-8">{children}</main>
+      <footer className="border-t border-border py-4 text-center text-xs text-muted">
+        Zona de operaciones del SaaS · las cuentas de los salones no ven esta consola
+      </footer>
     </div>
   );
 }
