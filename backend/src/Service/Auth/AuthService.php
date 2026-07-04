@@ -30,6 +30,7 @@ final class AuthService
     public function __construct(
         private readonly Connection $db,
         private readonly string $secret,
+        private readonly TotpService $totp,
         bool $debug = true,
     ) {
         // Defensa anti-forja: en producción (sin debug) no se arranca con un
@@ -55,13 +56,14 @@ final class AuthService
     }
 
     /**
-     * Valida credenciales y devuelve token + datos del usuario.
+     * Valida credenciales (y el código TOTP si el usuario tiene 2FA) y
+     * devuelve token + datos del usuario.
      *
      * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int, is_superadmin: bool}}
      *
      * @throws AuthException
      */
-    public function login(string $email, string $password): array
+    public function login(string $email, string $password, ?string $totpCode = null): array
     {
         $email = mb_strtolower(trim($email));
         if ($email === '' || $password === '') {
@@ -69,7 +71,7 @@ final class AuthService
         }
 
         $user = $this->db->fetchAssociative(
-            'SELECT id, name, email, password_hash, role, location_id, account_id, token_version, is_superadmin, active
+            'SELECT id, name, email, password_hash, role, location_id, account_id, token_version, is_superadmin, active, totp_secret
                FROM app_user WHERE email = ?',
             [$email]
         );
@@ -81,6 +83,18 @@ final class AuthService
 
         if ($user === false || !$ok || !$user['active']) {
             throw new AuthException('INVALID_CREDENTIALS', 'Email o contraseña incorrectos.', 401);
+        }
+
+        // Doble factor: con 2FA activo, la contraseña sola no basta. El código
+        // solo se pide una vez validada la contraseña (no filtra quién tiene 2FA
+        // sin credenciales correctas).
+        if ($user['totp_secret'] !== null) {
+            if ($totpCode === null || trim($totpCode) === '') {
+                throw new AuthException('TOTP_REQUIRED', 'Introduce el código de tu app de autenticación.', 401);
+            }
+            if (!$this->totp->verify((string) $user['totp_secret'], $totpCode)) {
+                throw new AuthException('TOTP_INVALID', 'Código de verificación incorrecto.', 401);
+            }
         }
 
         $context = [

@@ -445,8 +445,19 @@ async function adminFetch<T>(path: string, opts: { method?: string; body?: unkno
 }
 
 export const admin = {
-  login: (email: string, password: string) =>
-    adminFetch<LoginResponse>("/api/v1/auth/login", { method: "POST", body: { email, password } }),
+  login: (email: string, password: string, totpCode?: string) =>
+    adminFetch<LoginResponse>("/api/v1/auth/login", {
+      method: "POST",
+      body: { email, password, ...(totpCode ? { totp_code: totpCode } : {}) },
+    }),
+
+  twoFactor: () => adminFetch<{ enabled: boolean }>("/api/v1/admin/2fa"),
+  twoFactorSetup: () =>
+    adminFetch<{ secret: string; otpauth_uri: string }>("/api/v1/admin/2fa/setup", { method: "POST" }),
+  twoFactorEnable: (secret: string, code: string) =>
+    adminFetch<{ ok: boolean; enabled: boolean }>("/api/v1/admin/2fa/enable", { method: "POST", body: { secret, code } }),
+  twoFactorDisable: (code: string) =>
+    adminFetch<{ ok: boolean; enabled: boolean }>("/api/v1/admin/2fa/disable", { method: "POST", body: { code } }),
 
   signup: (body: SignupInput) => adminFetch<SignupResponse>("/api/v1/signup", { method: "POST", body }),
 

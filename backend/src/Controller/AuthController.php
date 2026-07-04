@@ -39,6 +39,7 @@ final class AuthController extends AbstractController
             $result = $this->auth->login(
                 is_string($payload['email'] ?? null) ? $payload['email'] : '',
                 is_string($payload['password'] ?? null) ? $payload['password'] : '',
+                is_string($payload['totp_code'] ?? null) ? $payload['totp_code'] : null,
             );
         } catch (AuthException $e) {
             return $this->json(['error' => ['code' => $e->errorCode, 'message' => $e->getMessage()]], $e->statusCode);

@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { admin, setToken } from "@/lib/admin";
+import { admin, AdminApiError, setToken } from "@/lib/admin";
 
 export default function PanelLogin() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totp, setTotp] = useState("");
+  const [totpNeeded, setTotpNeeded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -17,11 +19,18 @@ export default function PanelLogin() {
     setLoading(true);
     setError(null);
     try {
-      const res = await admin.login(email.trim(), password);
+      const res = await admin.login(email.trim(), password, totpNeeded ? totp.trim() : undefined);
       setToken(res.token);
       router.replace("/panel");
-    } catch {
-      setError("Email o contraseña incorrectos.");
+    } catch (err) {
+      if (err instanceof AdminApiError && err.code === "TOTP_REQUIRED") {
+        // Credenciales correctas: falta el segundo factor.
+        setTotpNeeded(true);
+      } else if (err instanceof AdminApiError && err.code === "TOTP_INVALID") {
+        setError("Código de verificación incorrecto.");
+      } else {
+        setError("Email o contraseña incorrectos.");
+      }
       setLoading(false);
     }
   }
@@ -63,6 +72,26 @@ export default function PanelLogin() {
               className="field"
             />
           </label>
+
+          {totpNeeded ? (
+            <label className="block text-sm font-semibold">
+              Código de verificación
+              <input
+                value={totp}
+                required
+                autoFocus
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                maxLength={6}
+                onChange={(e) => setTotp(e.target.value)}
+                className="field text-center font-mono text-lg tracking-[0.4em]"
+              />
+              <span className="mt-1 block text-xs font-normal text-muted">
+                El código de 6 dígitos de tu app de autenticación.
+              </span>
+            </label>
+          ) : null}
 
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
 

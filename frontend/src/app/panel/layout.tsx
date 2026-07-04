@@ -22,6 +22,7 @@ const NAV: Array<{ href: string; label: string; icon: string; roles?: string[] }
   { href: "/panel/informes", label: "Informes", icon: "📊" },
   { href: "/panel/cuenta", label: "Cuenta", icon: "💳" },
   { href: "/panel/apariencia", label: "Apariencia", icon: "🎨" },
+  { href: "/panel/seguridad", label: "Seguridad", icon: "🔒" },
   { href: "/panel/usuarios", label: "Usuarios", icon: "🔐", roles: ["admin_cadena"] },
   { href: "/panel/auditoria", label: "Auditoría", icon: "🧾", roles: ["admin_cadena"] },
 ];

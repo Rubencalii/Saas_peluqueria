@@ -35,7 +35,7 @@ final class AuthServiceTest extends KernelTestCase
 
         // En prod (debug=false), un secreto corto o placeholder revienta el arranque.
         $this->expectException(\RuntimeException::class);
-        new AuthService($db, 'corto', false);
+        new AuthService($db, 'corto', new \App\Service\Auth\TotpService(), false);
     }
 
     public function testAceptaSecretoFuerteEnProduccion(): void
@@ -44,7 +44,7 @@ final class AuthServiceTest extends KernelTestCase
         $db = static::getContainer()->get('doctrine.dbal.default_connection');
 
         $strong = '0123456789abcdef0123456789abcdef0123456789abcdef';
-        $svc = new AuthService($db, $strong, false);
+        $svc = new AuthService($db, $strong, new \App\Service\Auth\TotpService(), false);
         self::assertInstanceOf(AuthService::class, $svc);
     }
 
