@@ -24,7 +24,6 @@ final class SignupTest extends WebTestCase
         /** @var Connection $db */
         $db = static::getContainer()->get('doctrine.dbal.default_connection');
         $this->db = $db;
-        $this->db->setNestTransactionsWithSavepoints(true);
         $this->db->beginTransaction();
     }
 

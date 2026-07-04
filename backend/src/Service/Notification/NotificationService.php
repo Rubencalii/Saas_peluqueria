@@ -174,7 +174,10 @@ final class NotificationService
 
     private function locale(?string $locale): string
     {
-        return isset(self::TEMPLATES[$locale]) ? (string) $locale : self::DEFAULT_LOCALE;
+        // PHP 8.5 depreca null como índice de array: normaliza antes de mirar.
+        $locale ??= '';
+
+        return isset(self::TEMPLATES[$locale]) ? $locale : self::DEFAULT_LOCALE;
     }
 
     /**
