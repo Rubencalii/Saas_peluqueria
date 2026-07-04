@@ -36,18 +36,35 @@ export default function SuperAdminHome() {
     await load();
   }
 
-  if (loading) return <div className="card h-64 animate-pulse" />;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="skeleton h-9 w-72" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="skeleton h-24" />
+          ))}
+        </div>
+        <div className="skeleton h-64" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Cuentas de la plataforma</h1>
+    <div className="fade-up space-y-6">
+      <header>
+        <h1 className="font-display text-3xl font-bold tracking-tight">Cuentas de la plataforma</h1>
+        <p className="mt-1 text-sm text-muted">
+          Todos los salones del SaaS: su plan, su uso y su estado. Suspender deja la cuenta en solo lectura.
+        </p>
+      </header>
 
       {stats ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Stat label="Cuentas" value={stats.accounts.total} />
-          <Stat label="Activas" value={stats.accounts.active} />
-          <Stat label="En prueba" value={stats.accounts.trial} />
-          <Stat label="Suspendidas" value={stats.accounts.suspended} />
+          <Stat label="Activas" value={stats.accounts.active} dot="var(--accent)" />
+          <Stat label="En prueba" value={stats.accounts.trial} dot="#38bdf8" />
+          <Stat label="Suspendidas" value={stats.accounts.suspended} dot="#ef4444" />
           <Stat label="Citas (total)" value={stats.appointments_total} />
         </div>
       ) : null}
@@ -68,10 +85,18 @@ export default function SuperAdminHome() {
               const st = STATUS[a.status] ?? { label: a.status, cls: "bg-zinc-200 text-zinc-600" };
               const suspended = a.status === "suspended" || a.status === "cancelled";
               return (
-                <tr key={a.id} className="border-b border-border/60 last:border-0">
+                <tr
+                  key={a.id}
+                  className={
+                    "border-b border-border/60 transition last:border-0 hover:bg-brand-soft/40 " +
+                    (suspended ? "opacity-60" : "")
+                  }
+                >
                   <td className="px-4 py-3">
                     <p className="font-medium">{a.name}</p>
-                    <p className="text-xs text-muted">{a.slug}</p>
+                    <p className="text-xs text-muted">
+                      {a.slug} · desde {new Date(a.created_at).toLocaleDateString("es-ES")}
+                    </p>
                   </td>
                   <td className="px-4 py-3">
                     <span className={"chip " + st.cls}>{st.label}</span>
@@ -120,11 +145,14 @@ export default function SuperAdminHome() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, dot }: { label: string; value: number; dot?: string }) {
   return (
     <div className="card p-4 text-center">
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-xs text-muted">{label}</p>
+      <p className="text-2xl font-bold tabular-nums">{value}</p>
+      <p className="mt-0.5 flex items-center justify-center gap-1.5 text-xs text-muted">
+        {dot ? <span className="h-2 w-2 rounded-full" style={{ background: dot }} /> : null}
+        {label}
+      </p>
     </div>
   );
 }
