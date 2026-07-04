@@ -101,3 +101,82 @@ jobs:
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: peluqueria
+          POSTGRES_PASSWORD: peluqueria
+          POSTGRES_DB: peluqueria
+          TZ: UTC
+          PGTZ: UTC
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U peluqueria -d peluqueria"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # El smoke corre contra la BD "de desarrollo" (APP_ENV=dev del backend).
+      DATABASE_URL: "postgresql://peluqueria:peluqueria@127.0.0.1:5432/peluqueria?serverVersion=16&charset=utf8"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pgsql, ctype, iconv
+          coverage: none
+
+      - name: Instalar cliente de PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Preparar base de datos (migraciones + seed)
+        env:
+          PGPASSWORD: peluqueria
+        run: |
+          for f in $(ls db/migrations/*.sql | sort) db/seed.sql; do
+            psql -h 127.0.0.1 -U peluqueria -d peluqueria -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      - name: Instalar dependencias del backend
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias del frontend
+        working-directory: frontend
+        run: npm ci
+
+      - name: Instalar Chromium de Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # Playwright arranca solo backend (PHP embebido) y frontend (next dev).
+      - name: Smoke E2E
+        working-directory: frontend
+        run: npx playwright test
+
+      - name: Guardar informe si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/test-results/
+          retention-days: 7
