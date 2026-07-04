@@ -11,7 +11,9 @@ use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * Registro de actividad del panel (doc 09 §6): traza las acciones de escritura
- * sobre `/api/v1/admin` (quién, método, ruta, resultado).
+ * sobre `/api/v1/admin` y `/api/v1/superadmin` (quién, método, ruta, resultado).
+ * Las de plataforma (suspender cuentas, cambiar planes, impersonar) son las más
+ * sensibles del sistema: siempre dejan rastro.
  *
  * Se ejecuta en `kernel.terminate` (después de responder), así que no añade
  * latencia, y nunca rompe la petición (todo va en try/catch).
@@ -30,7 +32,9 @@ final class AuditListener
         $request = $event->getRequest();
         $method = $request->getMethod();
 
-        if (!in_array($method, self::WRITE_METHODS, true) || !str_starts_with($request->getPathInfo(), '/api/v1/admin')) {
+        $path = $request->getPathInfo();
+        $audited = str_starts_with($path, '/api/v1/admin') || str_starts_with($path, '/api/v1/superadmin');
+        if (!in_array($method, self::WRITE_METHODS, true) || !$audited) {
             return;
         }
 

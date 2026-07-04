@@ -27,12 +27,29 @@ export interface SaAccount {
   plan_code: string | null;
   plan_name: string | null;
   subscription_status: string | null;
+  /** true si la suscripción la gestiona Stripe (cambiar plan a mano desincroniza el cobro). */
+  stripe_managed: boolean;
   counts: { locations: number; users: number; customers: number; appointments: number };
+}
+
+export interface SaAccountDetail {
+  account: { id: number; name: string; slug: string; status: string; created_at: string };
+  subscription: {
+    plan_code: string;
+    plan_name: string | null;
+    status: string;
+    current_period_end: string | null;
+    stripe_managed: boolean;
+  } | null;
+  admins: Array<{ id: number; name: string; email: string; active: boolean }>;
+  locations: Array<{ id: number; name: string; slug: string; active: boolean }>;
+  activity: { appointments_30d: number; last_appointment_at: string | null };
 }
 
 export interface SaStats {
   accounts: { total: number; active: number; trial: number; suspended: number; cancelled: number };
   appointments_total: number;
+  signups_8w: Array<{ week: string; count: number }>;
 }
 
 export interface LoginResponse {
@@ -567,4 +584,10 @@ export const admin = {
   saAccounts: () => adminFetch<{ accounts: SaAccount[] }>("/api/v1/superadmin/accounts"),
   saUpdateAccount: (id: number, body: { status?: string; plan_code?: string }) =>
     adminFetch<{ ok: boolean }>(`/api/v1/superadmin/accounts/${id}`, { method: "PATCH", body }),
+  saAccount: (id: number) => adminFetch<SaAccountDetail>(`/api/v1/superadmin/accounts/${id}`),
+  saImpersonate: (id: number) =>
+    adminFetch<LoginResponse & { account: { id: number; name: string } }>(
+      `/api/v1/superadmin/accounts/${id}/impersonate`,
+      { method: "POST" },
+    ),
 };

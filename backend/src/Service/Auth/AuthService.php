@@ -176,6 +176,45 @@ final class AuthService
     }
 
     /**
+     * Emite una sesión para OTRO usuario (impersonación del superadmin para
+     * dar soporte). El permiso lo comprueba quien llama; aquí solo se valida
+     * que el usuario exista y esté activo. La petición queda registrada en el
+     * audit_log a nombre del superadmin (AuditListener).
+     *
+     * @return array{token: string, expires_at: string, user: array{id: int, name: string, email: string, role: string, location_id: int|null, account_id: int, is_superadmin: bool}}
+     *
+     * @throws AuthException
+     */
+    public function impersonate(int $userId): array
+    {
+        $user = $this->db->fetchAssociative(
+            'SELECT id, name, email, role, location_id, account_id, token_version, is_superadmin, active
+               FROM app_user WHERE id = ?',
+            [$userId]
+        );
+        if ($user === false || !$user['active']) {
+            throw new AuthException('NOT_FOUND', 'Usuario no disponible.', 404);
+        }
+
+        $context = [
+            'id' => (int) $user['id'],
+            'name' => (string) $user['name'],
+            'email' => (string) $user['email'],
+            'role' => (string) $user['role'],
+            'location_id' => $user['location_id'] !== null ? (int) $user['location_id'] : null,
+            'account_id' => (int) $user['account_id'],
+            'is_superadmin' => (bool) $user['is_superadmin'],
+        ];
+        $exp = time() + self::TTL_SECONDS;
+
+        return [
+            'token' => $this->issue($context, $exp, (int) $user['token_version']),
+            'expires_at' => (new \DateTimeImmutable('@' . $exp))->format('c'),
+            'user' => $context,
+        ];
+    }
+
+    /**
      * Revoca todas las sesiones del usuario: los tokens emitidos hasta ahora
      * dejan de ser válidos (logout en todos los dispositivos).
      */

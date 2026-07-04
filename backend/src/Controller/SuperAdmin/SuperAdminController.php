@@ -20,8 +20,10 @@ final class SuperAdminController extends AdminController
 {
     private const ACCOUNT_STATUSES = ['active', 'trial', 'suspended', 'cancelled'];
 
-    public function __construct(private readonly Connection $db)
-    {
+    public function __construct(
+        private readonly Connection $db,
+        private readonly \App\Service\Auth\AuthService $auth,
+    ) {
     }
 
     #[Route('/api/v1/superadmin/stats', name: 'superadmin_stats', methods: ['GET'])]
@@ -41,6 +43,14 @@ final class SuperAdminController extends AdminController
         ) ?: [];
         $appointments = (int) $this->db->fetchOne('SELECT COUNT(*) FROM appointment');
 
+        // Crecimiento: altas de cuentas por semana (últimas 8, incluida la actual).
+        $signups = $this->db->fetchAllAssociative(
+            "SELECT to_char(date_trunc('week', created_at), 'YYYY-MM-DD') AS week, COUNT(*) AS n
+               FROM account
+              WHERE created_at >= date_trunc('week', now()) - interval '7 weeks'
+              GROUP BY 1 ORDER BY 1"
+        );
+
         return $this->json([
             'accounts' => [
                 'total' => (int) ($row['total'] ?? 0),
@@ -50,6 +60,10 @@ final class SuperAdminController extends AdminController
                 'cancelled' => (int) ($row['cancelled'] ?? 0),
             ],
             'appointments_total' => $appointments,
+            'signups_8w' => array_map(static fn (array $s): array => [
+                'week' => (string) $s['week'],
+                'count' => (int) $s['n'],
+            ], $signups),
         ]);
     }
 
@@ -63,6 +77,7 @@ final class SuperAdminController extends AdminController
         $rows = $this->db->fetchAllAssociative(
             "SELECT a.id, a.name, a.slug, a.status, a.created_at,
                     s.plan_code, p.name AS plan_name, s.status AS sub_status, s.current_period_end,
+                    (s.stripe_subscription_id IS NOT NULL) AS stripe_managed,
                     (SELECT COUNT(*) FROM location l WHERE l.account_id = a.id) AS locations,
                     (SELECT COUNT(*) FROM app_user u WHERE u.account_id = a.id) AS users,
                     (SELECT COUNT(*) FROM customer c WHERE c.account_id = a.id) AS customers,
@@ -84,6 +99,7 @@ final class SuperAdminController extends AdminController
                 'plan_code' => $r['plan_code'] !== null ? (string) $r['plan_code'] : null,
                 'plan_name' => $r['plan_name'] !== null ? (string) $r['plan_name'] : null,
                 'subscription_status' => $r['sub_status'] !== null ? (string) $r['sub_status'] : null,
+                'stripe_managed' => (bool) $r['stripe_managed'],
                 'counts' => [
                     'locations' => (int) $r['locations'],
                     'users' => (int) $r['users'],
@@ -91,6 +107,127 @@ final class SuperAdminController extends AdminController
                     'appointments' => (int) $r['appointments'],
                 ],
             ], $rows),
+        ]);
+    }
+
+    /**
+     * Ficha completa de una cuenta: quién está detrás (admins con su email),
+     * sedes, suscripción (y si la gestiona Stripe) y actividad reciente.
+     */
+    #[Route('/api/v1/superadmin/accounts/{id}', name: 'superadmin_account_detail', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function detail(int $id, Request $request): JsonResponse
+    {
+        if (($deny = $this->guard($request)) !== null) {
+            return $deny;
+        }
+
+        $account = $this->db->fetchAssociative(
+            'SELECT id, name, slug, status, created_at FROM account WHERE id = ?',
+            [$id]
+        );
+        if ($account === false) {
+            return $this->error('NOT_FOUND', 'Cuenta no encontrada.', 404);
+        }
+
+        $sub = $this->db->fetchAssociative(
+            'SELECT s.plan_code, p.name AS plan_name, s.status, s.current_period_end,
+                    (s.stripe_subscription_id IS NOT NULL) AS stripe_managed
+               FROM subscription s LEFT JOIN plan p ON p.code = s.plan_code
+              WHERE s.account_id = ?',
+            [$id]
+        );
+        $admins = $this->db->fetchAllAssociative(
+            "SELECT id, name, email, active FROM app_user
+              WHERE account_id = ? AND role = 'admin_cadena' ORDER BY id",
+            [$id]
+        );
+        $locations = $this->db->fetchAllAssociative(
+            'SELECT id, name, slug, active FROM location WHERE account_id = ? ORDER BY name',
+            [$id]
+        );
+        $activity = $this->db->fetchAssociative(
+            "SELECT COUNT(*) FILTER (WHERE ap.start_at >= now() - interval '30 days' AND ap.start_at <= now()) AS appointments_30d,
+                    MAX(ap.start_at) AS last_appointment_at
+               FROM appointment ap JOIN location l ON l.id = ap.location_id
+              WHERE l.account_id = ?",
+            [$id]
+        ) ?: [];
+
+        return $this->json([
+            'account' => [
+                'id' => (int) $account['id'],
+                'name' => (string) $account['name'],
+                'slug' => (string) $account['slug'],
+                'status' => (string) $account['status'],
+                'created_at' => (new \DateTimeImmutable($account['created_at']))->format('c'),
+            ],
+            'subscription' => $sub !== false ? [
+                'plan_code' => (string) $sub['plan_code'],
+                'plan_name' => $sub['plan_name'] !== null ? (string) $sub['plan_name'] : null,
+                'status' => (string) $sub['status'],
+                'current_period_end' => $sub['current_period_end'] !== null
+                    ? (new \DateTimeImmutable($sub['current_period_end']))->format('c')
+                    : null,
+                'stripe_managed' => (bool) $sub['stripe_managed'],
+            ] : null,
+            'admins' => array_map(static fn (array $u): array => [
+                'id' => (int) $u['id'],
+                'name' => (string) $u['name'],
+                'email' => (string) $u['email'],
+                'active' => (bool) $u['active'],
+            ], $admins),
+            'locations' => array_map(static fn (array $l): array => [
+                'id' => (int) $l['id'],
+                'name' => (string) $l['name'],
+                'slug' => (string) $l['slug'],
+                'active' => (bool) $l['active'],
+            ], $locations),
+            'activity' => [
+                'appointments_30d' => (int) ($activity['appointments_30d'] ?? 0),
+                'last_appointment_at' => ($activity['last_appointment_at'] ?? null) !== null
+                    ? (new \DateTimeImmutable((string) $activity['last_appointment_at']))->format('c')
+                    : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Impersonación para soporte: emite una sesión del primer admin activo de
+     * la cuenta. La petición queda en audit_log a nombre del superadmin.
+     */
+    #[Route('/api/v1/superadmin/accounts/{id}/impersonate', name: 'superadmin_impersonate', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function impersonate(int $id, Request $request): JsonResponse
+    {
+        if (($deny = $this->guard($request)) !== null) {
+            return $deny;
+        }
+
+        $accountName = $this->db->fetchOne('SELECT name FROM account WHERE id = ?', [$id]);
+        if ($accountName === false) {
+            return $this->error('NOT_FOUND', 'Cuenta no encontrada.', 404);
+        }
+
+        $userId = $this->db->fetchOne(
+            "SELECT id FROM app_user
+              WHERE account_id = ? AND role = 'admin_cadena' AND active AND NOT is_superadmin
+              ORDER BY id LIMIT 1",
+            [$id]
+        );
+        if ($userId === false) {
+            return $this->error('NO_ADMIN', 'La cuenta no tiene ningún administrador activo.', 409);
+        }
+
+        try {
+            $session = $this->auth->impersonate((int) $userId);
+        } catch (\App\Service\Auth\AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        return $this->json([
+            'token' => $session['token'],
+            'expires_at' => $session['expires_at'],
+            'user' => $session['user'],
+            'account' => ['id' => $id, 'name' => (string) $accountName],
         ]);
     }
 

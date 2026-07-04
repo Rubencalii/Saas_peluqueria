@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { admin, clearToken, getToken, type PanelUser } from "@/lib/admin";
+import { admin, clearToken, getToken, setToken, type PanelUser } from "@/lib/admin";
 import { brandName, brandVars, type Branding } from "@/lib/theme";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -34,6 +34,20 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   const [user, setUser] = useState<PanelUser | null>(null);
   const [branding, setBranding] = useState<Branding | null>(null);
   const [ready, setReady] = useState(false);
+  // Soporte de plataforma: nombre de la cuenta si esta sesión es impersonada.
+  const [impersonating, setImpersonating] = useState<string | null>(null);
+
+  useEffect(() => {
+    setImpersonating(window.localStorage.getItem("sa_impersonating"));
+  }, []);
+
+  function backToConsole() {
+    const saToken = window.localStorage.getItem("sa_return_token");
+    window.localStorage.removeItem("sa_impersonating");
+    window.localStorage.removeItem("sa_return_token");
+    if (saToken) setToken(saToken);
+    window.location.href = "/superadmin";
+  }
 
   useEffect(() => {
     if (isLogin) {
@@ -83,6 +97,9 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
       /* da igual: limpiamos igualmente */
     }
     clearToken();
+    // Si era una sesión de soporte, no dejar rastro de la vuelta a consola.
+    window.localStorage.removeItem("sa_impersonating");
+    window.localStorage.removeItem("sa_return_token");
     router.replace("/panel/login");
   }
 
@@ -153,6 +170,20 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
 
         <main className="flex-1 p-5 md:p-8">
           <div className="mx-auto max-w-4xl space-y-5">
+            {impersonating ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                <span>
+                  🎧 Estás dentro de <span className="font-semibold">«{impersonating}»</span> como soporte de
+                  plataforma.
+                </span>
+                <button
+                  onClick={backToConsole}
+                  className="rounded-full border border-indigo-400 px-3 py-1.5 font-medium hover:bg-indigo-100"
+                >
+                  ← Volver a mi consola
+                </button>
+              </div>
+            ) : null}
             {user && user.email_verified === false ? <VerifyBanner /> : null}
             {children}
           </div>
