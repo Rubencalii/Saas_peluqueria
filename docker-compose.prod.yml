@@ -1,0 +1,124 @@
+# Producción autocontenida en un host con Docker (doc 11).
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Requiere en la raíz un `.env` (gitignorado) con al menos:
+#   DOMAIN=reservas.tu-dominio.com
+#   DB_PASSWORD=<contraseña del owner de la BD>
+# y `backend/.env.prod` relleno a partir de backend/.env.prod.example.
+# Primera puesta en marcha y backups: ver deploy/README.md.
+
+name: peluqueria-prod
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-peluqueria}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
+      POSTGRES_DB: ${DB_NAME:-peluqueria}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-peluqueria} -d ${DB_NAME:-peluqueria}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: backend/.env.prod
+    volumes:
+      # Migraciones SQL (app:db:migrate las busca en ../db/migrations).
+      - ./db:/var/www/db:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Tareas programadas (recordatorios, lista de espera, recurrentes, purga).
+  scheduler:
+    build: ./backend
+    restart: unless-stopped
+    env_file: backend/.env.prod
+    volumes:
+      - ./db:/var/www/db:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c 'echo "[scheduler] arrancado"; sleep 30;
+      while true; do
+        php bin/console app:notifications:dispatch || true;
+        php bin/console app:waitlist:notify || true;
+        php bin/console app:recurring:generate || true;
+        if [ "$$(date +%H%M | cut -c1-2)" = "04" ] && [ ! -f /tmp/purged-$$(date +%F) ]; then
+          php bin/console app:notifications:return-reminders || true;
+          php bin/console app:maintenance:purge && touch /tmp/purged-$$(date +%F) || true;
+        fi;
+        sleep 300;
+      done'
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        API_BASE: "http://backend"
+    restart: unless-stopped
+    environment:
+      API_BASE: "http://backend"
+    depends_on:
+      - backend
+
+  # Punto de entrada único con TLS automático (Let's Encrypt).
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Define DOMAIN en .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
+  # Backup diario con retención (doc 11 §6). Restauración: deploy/README.md.
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: ${DB_USER:-peluqueria}
+      PGPASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
+      PGDATABASE: ${DB_NAME:-peluqueria}
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: >
+      sh -c 'echo "[backup] arrancado (retención $${RETENTION_DAYS} días)";
+      while true; do
+        ts=$$(date +%F_%H%M);
+        if pg_dump -Fc -f "/backups/peluqueria_$${ts}.dump"; then
+          echo "[backup] ok peluqueria_$${ts}.dump";
+        else
+          echo "[backup] FALLO en $${ts}" >&2;
+        fi;
+        find /backups -name "*.dump" -mtime +$${RETENTION_DAYS} -delete;
+        sleep 86400;
+      done'
+
+volumes:
+  pgdata_prod:
+  caddy_data:
+  caddy_config:

@@ -42,22 +42,19 @@
 
 ---
 
-## 2. En curso (working tree, sin commitear)
+## 2. Añadido después de la primera versión de este doc (ya en `main`)
 
-**Informes comparativos vs periodo anterior** — a medias:
-- ✅ Helpers puros en `frontend/src/lib/reports.ts`: `previousRange(from, to)` (rango anterior de la misma duración), `pctDelta` (variación relativa), `ppDelta` (puntos porcentuales) — **con tests ya escritos** en `reports.test.ts`.
-- ✅ `informes/page.tsx`: imports y estado `prev` añadidos.
-- ⬜ Falta: en `load()`, pedir en paralelo los 4 KPIs del rango `previousRange(from, to)` y guardarlos en `prev`; pintar deltas en los `Kpi` (ingresos: % relativo; no-show y retención: puntos porcentuales, con color según sea bueno/malo; valoración: diferencia absoluta en ★). Verificar (lint/vitest/build) y commitear.
+- ✅ **Informes comparativos**: cada KPI muestra su variación vs el periodo anterior (`previousRange`/`pctDelta`/`ppDelta` con tests).
+- ✅ **Smoke E2E con Playwright** (`npm run e2e`, 2/2 en verde local): reserva pública de punta a punta y login del panel + agenda. Arranca backend (PHP embebido) y `next dev` solo; requiere la BD dev (`docker compose up -d`).
+- ✅ **Despliegue de producción**: `backend/Dockerfile` (Apache+PHP 8.5, opcache, imagen verificada), `frontend/Dockerfile` (Next standalone, imagen verificada), `docker-compose.prod.yml` (db, backend, scheduler de crons, frontend, Caddy con TLS, backup diario `pg_dump` con retención) y runbook en `deploy/README.md` (migraciones con `app:db:migrate`, restauración probada de backups).
 
 ---
 
 ## 3. Pendiente (por orden recomendado)
 
-1. **Terminar informes comparativos** (ver §2 — es media hora).
-2. **Smoke E2E con Playwright**: flujo real en navegador de (a) reserva pública completa y (b) login del panel + agenda. Es el mayor hueco de confianza: los tests de frontend actuales solo cubren helpers puros. Requiere descargar navegadores (red) y arrancar backend+frontend coordinados.
-3. **Despliegue de producción** (materializar `docs/11-despliegue-devops.md`): Dockerfile de producción para backend (php-fpm + nginx) y frontend (standalone), compose de prod, estrategia de backups de Postgres (pg_dump programado + retención), variables de entorno documentadas.
-4. **Monitorización de errores (Sentry)** en backend y frontend, con DSN por variable de entorno y degradación silenciosa sin él (patrón de las demás integraciones).
-5. **Backlog de producto** (sin compromiso, doc 13): bonos/packs y tarjetas regalo, multi-idioma (ca/en), SEO por salón (metadata/OG por slug), comparativas más ricas en informes (series temporales), app del profesional (PWA).
+1. **Hyper diseño del SaaS** *(en curso — petición del 2026-07-04)*: elevar el acabado visual de la web pública y el panel (sistema de diseño en `globals.css`: sombras, radios, foco, microinteracciones, dark mode) y **perfeccionar el editor de apariencia** (`/panel/apariencia`): vista previa en vivo, paletas predefinidas, aviso de contraste. Ojo: no renombrar clases que usa el E2E (`card-link`, `slot`, `font-mono`).
+2. **Monitorización de errores (Sentry)** en backend y frontend, con DSN por variable de entorno y degradación silenciosa sin él (patrón de las demás integraciones).
+3. **Backlog de producto** (sin compromiso, doc 13): bonos/packs y tarjetas regalo, multi-idioma (ca/en), SEO por salón (metadata/OG por slug), series temporales en informes, app del profesional (PWA).
 
 ---
 

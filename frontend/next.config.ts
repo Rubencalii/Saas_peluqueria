@@ -32,6 +32,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // La imagen Docker de producción usa el runtime compacto (server.js).
+  // Se activa solo en el build de la imagen para no cambiar `next start` local.
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_BASE}/api/:path*` }];
   },

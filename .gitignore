@@ -24,3 +24,8 @@ node_modules/
 Thumbs.db
 desktop.ini
 *~
+
+# Producción (compose): secretos y copias de seguridad locales
+/.env
+backend/.env.prod
+/backups/

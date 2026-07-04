@@ -1,0 +1,14 @@
+# Punto de entrada único: TLS automático (Let's Encrypt) y enrutado
+# same-origin — /api/* al backend, el resto al frontend. Así el navegador
+# nunca hace CORS y la CSP del frontend sigue valiendo tal cual.
+{$DOMAIN} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy backend:80
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
