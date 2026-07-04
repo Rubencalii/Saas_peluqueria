@@ -8,5 +8,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
+    // Solo los unit tests de src; los E2E (e2e/*.spec.ts) son de Playwright.
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });
