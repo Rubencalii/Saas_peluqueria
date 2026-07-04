@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { admin, type CustomerDetail, type CustomerList } from "@/lib/admin";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDateLong, formatTime } from "@/lib/format";
 import { nextAppointment } from "@/lib/dashboard";
 
@@ -22,6 +23,7 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [canGdpr, setCanGdpr] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     admin
@@ -55,11 +57,48 @@ export default function ClientesPage() {
 
   const totalPages = list ? Math.max(1, Math.ceil(list.total / list.per_page)) : 1;
 
+  // Exporta el listado COMPLETO con el filtro actual (búsqueda + consentimiento).
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const rows: Array<Array<string | number | null>> = [];
+      for (let p = 1; p <= 500; p++) {
+        const chunk = await admin.customers(debounced, p, consent);
+        for (const c of chunk.customers) {
+          rows.push([
+            c.name,
+            c.phone,
+            c.email,
+            c.wa_consent ? "sí" : "no",
+            new Date(c.created_at).toLocaleDateString("es-ES"),
+          ]);
+        }
+        if (p * chunk.per_page >= chunk.total) break;
+      }
+      const suffix = consent === "yes" ? "_con-whatsapp" : consent === "no" ? "_sin-whatsapp" : "";
+      downloadCsv(
+        `clientes${suffix}.csv`,
+        toCsv(["Nombre", "Teléfono", "Email", "Consentimiento WhatsApp", "Alta"], rows),
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
-        {list ? <span className="text-sm text-muted">{list.total} en total</span> : null}
+        <div className="flex items-center gap-3">
+          {list ? <span className="text-sm text-muted">{list.total} en total</span> : null}
+          <button
+            onClick={exportCsv}
+            disabled={exporting || !list || list.total === 0}
+            className="btn-ghost px-3 py-1.5 text-xs"
+          >
+            {exporting ? "Exportando…" : "⬇ Exportar CSV"}
+          </button>
+        </div>
       </header>
 
       <input

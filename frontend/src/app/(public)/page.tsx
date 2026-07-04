@@ -7,6 +7,12 @@ import type { Location } from "@/lib/types";
 export const metadata: Metadata = {
   title: "Reserva tu cita",
   description: "Elige tu salón y reserva tu cita online en menos de un minuto.",
+  openGraph: {
+    title: "Reserva tu cita",
+    description: "Elige tu salón y reserva tu cita online en menos de un minuto.",
+    type: "website",
+    locale: "es_ES",
+  },
 };
 
 export default async function Home() {

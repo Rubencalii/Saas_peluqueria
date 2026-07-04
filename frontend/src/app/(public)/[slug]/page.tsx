@@ -13,7 +13,23 @@ export async function generateMetadata({
   const { slug } = await params;
   try {
     const loc = (await api.locations()).find((l) => l.slug === slug);
-    if (loc) return { title: `${loc.name} · Reservar cita` };
+    if (loc) {
+      const title = `${loc.name} · Reservar cita`;
+      const description = `Reserva tu cita en ${loc.name} online en menos de un minuto: elige servicio, día y hora, y te confirmamos por WhatsApp.`;
+
+      return {
+        title,
+        description,
+        // Para que compartir el enlace en WhatsApp/Instagram se vea bien.
+        openGraph: {
+          title,
+          description,
+          siteName: loc.name,
+          type: "website",
+          locale: "es_ES",
+        },
+      };
+    }
   } catch {
     /* usa el título por defecto */
   }
