@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { api } from "@/lib/api";
 import { brandCss, brandName, type Branding } from "@/lib/theme";
+import { normalizeLocale, t } from "@/lib/i18n";
+import { LangProvider } from "@/components/LangProvider";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Cada host (subdominio) es una cuenta distinta: render por petición, no estático.
@@ -9,6 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function PublicLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const locale = normalizeLocale((await cookies()).get("lang")?.value);
   let branding: Branding | null = null;
   try {
     branding = (await api.branding()).branding;
@@ -38,22 +43,25 @@ export default async function PublicLayout({
             )}
             <span className="text-[15px]">{name}</span>
           </Link>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <LanguageSwitcher current={locale} />
             <ThemeToggle />
             <Link
               href="/mi-cita"
               className="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted transition hover:bg-brand-soft hover:text-foreground"
             >
-              Mi cita
+              {t(locale, "nav.myAppointment")}
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+        <LangProvider locale={locale}>{children}</LangProvider>
+      </main>
 
       <footer className="border-t border-border/70 py-6 text-center text-xs text-muted">
-        Reservas online · Te confirmamos por WhatsApp 💬
+        {t(locale, "footer.tagline")}
       </footer>
     </div>
   );

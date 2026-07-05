@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { api } from "@/lib/api";
 import { ErrorNote } from "@/components/ErrorNote";
+import { normalizeLocale, t } from "@/lib/i18n";
 import type { Location } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -16,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
+  const locale = normalizeLocale((await cookies()).get("lang")?.value);
   let locations: Location[] = [];
   let failed = false;
   try {
@@ -37,35 +40,29 @@ export default async function Home() {
           className="pointer-events-none absolute -bottom-20 -left-12 h-44 w-44 rounded-full opacity-50 blur-3xl"
           style={{ background: "var(--accent-soft, var(--brand-soft))" }}
         />
-        <p className="chip bg-brand-soft text-brand-strong">✨ Reserva en 1 minuto</p>
+        <p className="chip bg-brand-soft text-brand-strong">{t(locale, "home.badge")}</p>
         <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl">
-          Tu próxima cita,
+          {t(locale, "home.title1")}
           <br className="hidden sm:block" />{" "}
           <span
             className="bg-clip-text text-transparent"
             style={{ backgroundImage: "linear-gradient(90deg, var(--brand), var(--accent))" }}
           >
-            sin llamadas ni esperas.
+            {t(locale, "home.title2")}
           </span>
         </h1>
-        <p className="mt-4 max-w-md text-muted">
-          Elige tu salón, el servicio y la hora que mejor te venga. Te confirmamos al instante por
-          WhatsApp.
-        </p>
+        <p className="mt-4 max-w-md text-muted">{t(locale, "home.subtitle")}</p>
       </section>
 
       <section className="fade-up" style={{ animationDelay: "80ms" }}>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-          Elige tu salón
+          {t(locale, "home.chooseSalon")}
         </h2>
 
         {failed ? (
-          <ErrorNote
-            title="No podemos cargar los salones ahora mismo."
-            detail="Vuelve a intentarlo en unos minutos."
-          />
+          <ErrorNote title={t(locale, "home.errorTitle")} detail={t(locale, "home.errorDetail")} />
         ) : locations.length === 0 ? (
-          <ErrorNote title="Aún no hay salones disponibles para reservar online." />
+          <ErrorNote title={t(locale, "home.empty")} />
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
             {locations.map((loc) => (
@@ -80,7 +77,7 @@ export default async function Home() {
                       →
                     </span>
                   </span>
-                  <span className="mt-1 block text-sm text-muted">Ver servicios y reservar</span>
+                  <span className="mt-1 block text-sm text-muted">{t(locale, "home.viewAndBook")}</span>
                 </Link>
               </li>
             ))}

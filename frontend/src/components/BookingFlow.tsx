@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { formatDateLong, formatPrice, formatTime, isoDate } from "@/lib/format";
 import { buildIcs } from "@/lib/ics";
 import { Deposit } from "@/components/Deposit";
+import { useLang } from "@/components/LangProvider";
 import type { AppointmentResult, Service, Slot } from "@/lib/types";
 
 type Step = "service" | "datetime" | "customer" | "done";
@@ -21,6 +22,7 @@ export function BookingFlow({
   timeZone: string;
   services: Service[];
 }) {
+  const { t, intl } = useLang();
   const [step, setStep] = useState<Step>("service");
   const [service, setService] = useState<Service | null>(null);
   const [date, setDate] = useState<string>(isoDate(new Date()));
@@ -96,11 +98,11 @@ export function BookingFlow({
       setStep("done");
     } catch (err) {
       if (err instanceof ApiError && err.code === "SLOT_TAKEN") {
-        setError("Vaya, ese hueco se acaba de ocupar. Elige otro, por favor.");
+        setError(t("book.slotTaken"));
         setStep("datetime");
         void loadSlots();
       } else {
-        setError(err instanceof Error ? err.message : "No se pudo completar la reserva.");
+        setError(err instanceof Error ? err.message : t("book.error"));
       }
     } finally {
       setSubmitting(false);
@@ -133,13 +135,13 @@ export function BookingFlow({
         >
           ✓
         </div>
-        <h2 className="font-display mt-4 text-3xl font-bold">¡Cita confirmada!</h2>
-        <p className="mt-1 text-muted">{capitalize(formatDateLong(result.start, timeZone))}</p>
-        <p className="text-xl font-semibold">{formatTime(result.start, timeZone)} h</p>
+        <h2 className="font-display mt-4 text-3xl font-bold">{t("book.done.title")}</h2>
+        <p className="mt-1 text-muted">{capitalize(formatDateLong(result.start, timeZone, intl))}</p>
+        <p className="text-xl font-semibold">{formatTime(result.start, timeZone, intl)}</p>
         <div className="mx-auto mt-5 max-w-sm rounded-2xl bg-brand-soft p-4 text-sm">
-          Tu código de cita es{" "}
+          {t("book.done.codeIs")}{" "}
           <span className="font-mono text-base font-bold tracking-wider">{result.public_code}</span>
-          <p className="mt-1 text-muted">Lo necesitarás para cambiarla o cancelarla en «Mi cita».</p>
+          <p className="mt-1 text-muted">{t("book.done.codeHint")}</p>
         </div>
 
         {service && service.deposit_amount !== null ? (
@@ -149,9 +151,9 @@ export function BookingFlow({
         ) : null}
 
         <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button type="button" onClick={addToCalendar} className="btn-ghost">📅 Añadir al calendario</button>
-          <Link href="/mi-cita" className="btn-ghost">Ver mi cita</Link>
-          <Link href="/" className="btn-primary">Hecho</Link>
+          <button type="button" onClick={addToCalendar} className="btn-ghost">{t("book.done.addCalendar")}</button>
+          <Link href="/mi-cita" className="btn-ghost">{t("book.done.viewMy")}</Link>
+          <Link href="/" className="btn-primary">{t("book.done.ok")}</Link>
         </div>
       </div>
     );
@@ -180,7 +182,7 @@ export function BookingFlow({
                     <div>
                       <p className="font-semibold">{s.name}</p>
                       <p className="text-sm text-muted">
-                        {s.duration_min} min{s.description ? ` · ${s.description}` : ""}
+                        {s.duration_min} {t("book.min")}{s.description ? ` · ${s.description}` : ""}
                       </p>
                     </div>
                   </div>
@@ -200,9 +202,9 @@ export function BookingFlow({
 
           {staffOptions.length > 1 ? (
             <div className="text-sm font-semibold">
-              ¿Con quién?
+              {t("book.withWhom")}
               <div className="mt-1.5 flex flex-wrap gap-2">
-                <StaffChip on={staffId === null} onClick={() => setStaffId(null)}>Sin preferencia</StaffChip>
+                <StaffChip on={staffId === null} onClick={() => setStaffId(null)}>{t("book.noPreference")}</StaffChip>
                 {staffOptions.map((p) => (
                   <StaffChip key={p.id} on={staffId === p.id} onClick={() => setStaffId(p.id)}>
                     {p.name}
@@ -213,7 +215,7 @@ export function BookingFlow({
           ) : null}
 
           <label className="block text-sm font-semibold">
-            Elige el día
+            {t("book.chooseDay")}
             <input
               type="date"
               value={date}
@@ -224,7 +226,7 @@ export function BookingFlow({
           </label>
 
           <div>
-            <p className="mb-2 text-sm font-semibold">Horas disponibles</p>
+            <p className="mb-2 text-sm font-semibold">{t("book.slots")}</p>
             {loadingSlots ? (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -235,13 +237,13 @@ export function BookingFlow({
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {slots.map((s) => (
                   <button key={s.start} onClick={() => chooseSlot(s)} className="slot">
-                    {formatTime(s.start, timeZone)}
+                    {formatTime(s.start, timeZone, intl)}
                   </button>
                 ))}
               </div>
             ) : (
               <p className="rounded-2xl border border-border bg-card p-4 text-sm text-muted">
-                No quedan huecos ese día. Prueba con otra fecha. 📅
+                {t("book.noSlots")}
               </p>
             )}
           </div>
@@ -251,13 +253,13 @@ export function BookingFlow({
       {step === "customer" && service && slot && (
         <form onSubmit={submit} className="space-y-4">
           <SelectedBadge
-            label={`${service.name} · ${capitalize(formatDateLong(slot.start, timeZone))} · ${formatTime(slot.start, timeZone)} h`}
+            label={`${service.name} · ${capitalize(formatDateLong(slot.start, timeZone, intl))} · ${formatTime(slot.start, timeZone, intl)}`}
             onChange={() => setStep("datetime")}
           />
 
-          <Field label="Nombre y apellidos" value={name} onChange={setName} required autoComplete="name" />
+          <Field label={t("book.name")} value={name} onChange={setName} required autoComplete="name" />
           <Field
-            label="Teléfono"
+            label={t("book.phone")}
             value={phone}
             onChange={setPhone}
             required
@@ -265,7 +267,7 @@ export function BookingFlow({
             autoComplete="tel"
             placeholder="+34 600 000 000"
           />
-          <Field label="Email (opcional)" value={email} onChange={setEmail} type="email" autoComplete="email" />
+          <Field label={t("book.emailOpt")} value={email} onChange={setEmail} type="email" autoComplete="email" />
 
           <label className="flex items-start gap-3 rounded-2xl bg-brand-soft/60 p-3 text-sm">
             <input
@@ -274,7 +276,7 @@ export function BookingFlow({
               onChange={(e) => setWaConsent(e.target.checked)}
               className="mt-0.5 h-4 w-4 accent-[var(--brand)]"
             />
-            <span>Quiero recibir la confirmación y el recordatorio por WhatsApp 💬</span>
+            <span>{t("book.waConsent")}</span>
           </label>
 
           <button
@@ -282,7 +284,7 @@ export function BookingFlow({
             disabled={submitting || name.trim() === "" || phone.trim() === ""}
             className="btn-primary w-full py-3.5"
           >
-            {submitting ? "Reservando…" : "Confirmar cita"}
+            {submitting ? t("book.confirming") : t("book.confirm")}
           </button>
         </form>
       )}
@@ -291,10 +293,11 @@ export function BookingFlow({
 }
 
 function Steps({ current }: { current: Step }) {
+  const { t } = useLang();
   const items: { key: Step; label: string }[] = [
-    { key: "service", label: "Servicio" },
-    { key: "datetime", label: "Día y hora" },
-    { key: "customer", label: "Tus datos" },
+    { key: "service", label: t("book.step.service") },
+    { key: "datetime", label: t("book.step.datetime") },
+    { key: "customer", label: t("book.step.customer") },
   ];
   const order: Step[] = ["service", "datetime", "customer", "done"];
   const idx = order.indexOf(current);
@@ -353,11 +356,12 @@ function StaffChip({ on, onClick, children }: { on: boolean; onClick: () => void
 }
 
 function SelectedBadge({ label, onChange }: { label: string; onChange: () => void }) {
+  const { t } = useLang();
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl bg-brand-soft px-4 py-2.5 text-sm">
       <span className="font-medium">{label}</span>
       <button type="button" onClick={onChange} className="shrink-0 font-semibold text-brand-strong underline">
-        Cambiar
+        {t("book.change")}
       </button>
     </div>
   );
