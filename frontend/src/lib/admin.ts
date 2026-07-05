@@ -551,6 +551,9 @@ export const admin = {
   setAppointmentStatus: (id: number, status: string) =>
     adminFetch<unknown>(`/api/v1/admin/appointments/${id}`, { method: "PATCH", body: { status } }),
 
+  setAppointmentNotes: (id: number, notes: string | null) =>
+    adminFetch<unknown>(`/api/v1/admin/appointments/${id}`, { method: "PATCH", body: { notes } }),
+
   cancelAppointment: (id: number) =>
     adminFetch<unknown>(`/api/v1/admin/appointments/${id}`, { method: "DELETE" }),
 

@@ -306,6 +306,31 @@ body {
   }
 }
 
+/* Impresión (listado del día en el mostrador): solo el contenido, en limpio. */
+@media print {
+  aside,
+  header,
+  footer,
+  nav,
+  button,
+  select,
+  input,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  main {
+    padding: 0 !important;
+  }
+  .card {
+    box-shadow: none;
+    border-color: #ddd;
+    break-inside: avoid;
+  }
+}
+
 /* Accesibilidad: sin animaciones ni desplazamientos para quien lo pide. */
 @media (prefers-reduced-motion: reduce) {
   *,

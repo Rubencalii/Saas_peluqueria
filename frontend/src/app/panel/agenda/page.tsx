@@ -136,6 +136,9 @@ export default function AgendaPage() {
               ))}
             </select>
           ) : null}
+          <button onClick={() => window.print()} disabled={!agenda} title="Imprimir el listado del día" className="btn-ghost px-4 py-2.5">
+            🖨️
+          </button>
           <button onClick={() => setNextOpen((v) => !v)} disabled={!locationId} className="btn-ghost px-4 py-2.5">
             🔎 Próximo hueco
           </button>
@@ -216,6 +219,15 @@ export default function AgendaPage() {
       </div>
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
+
+      {/* Cabecera solo para papel: qué sede y qué día es este listado. */}
+      {agenda ? (
+        <div className="hidden print:block">
+          <h2 className="text-xl font-bold">
+            {agenda.location.name} · {new Date(date + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          </h2>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="space-y-2">
@@ -661,6 +673,8 @@ function AppointmentRow({
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState(appt.notes ?? "");
   const st = STATUS[appt.status] ?? { label: appt.status, cls: "bg-zinc-200 text-zinc-600" };
   const canClose = appt.status === "pendiente" || appt.status === "confirmada";
 
@@ -672,6 +686,12 @@ function AppointmentRow({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function saveNotes() {
+    const value = notesDraft.trim();
+    await act(() => admin.setAppointmentNotes(appt.appointment_id, value === "" ? null : value));
+    setEditingNotes(false);
   }
 
   return (
@@ -689,11 +709,20 @@ function AppointmentRow({
           {appt.service.name}
           {appt.customer ? ` · ${appt.customer.phone}` : ""}
         </p>
+        {appt.notes && !editingNotes ? (
+          <button
+            onClick={() => setEditingNotes(true)}
+            title="Editar nota"
+            className="mt-1 block max-w-full truncate rounded-lg bg-amber-50 px-2 py-1 text-left text-xs text-amber-900 print:bg-transparent print:px-0"
+          >
+            📝 {appt.notes}
+          </button>
+        ) : null}
       </div>
       <span className={"chip " + st.cls}>{st.label}</span>
 
       {appt.status !== "cancelada" ? (
-        <div className="flex w-full gap-2 sm:w-auto">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           {canClose ? (
             <>
               <button
@@ -712,6 +741,11 @@ function AppointmentRow({
               </button>
             </>
           ) : null}
+          {!appt.notes && !editingNotes ? (
+            <button onClick={() => setEditingNotes(true)} className="btn-ghost px-3 py-1.5 text-xs">
+              📝 Nota
+            </button>
+          ) : null}
           <button
             disabled={busy}
             onClick={() => {
@@ -719,6 +753,26 @@ function AppointmentRow({
             }}
             className="btn-ghost px-3 py-1.5 text-xs text-red-700 hover:border-red-300"
           >
+            Cancelar
+          </button>
+        </div>
+      ) : null}
+
+      {editingNotes ? (
+        <div className="flex w-full gap-2">
+          <input
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void saveNotes(); }}
+            placeholder="Nota interna (alergias, preferencias, referencia…)"
+            autoFocus
+            maxLength={300}
+            className="field mt-0 flex-1 text-sm"
+          />
+          <button disabled={busy} onClick={saveNotes} className="btn-primary px-4 py-1.5 text-xs">
+            Guardar
+          </button>
+          <button onClick={() => { setEditingNotes(false); setNotesDraft(appt.notes ?? ""); }} className="btn-ghost px-3 py-1.5 text-xs">
             Cancelar
           </button>
         </div>
