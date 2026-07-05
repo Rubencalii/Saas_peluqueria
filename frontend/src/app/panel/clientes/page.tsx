@@ -220,6 +220,8 @@ function CustomerCard({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [isBirthdayToday, setIsBirthdayToday] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -231,6 +233,14 @@ function CustomerCard({
         setData(r.customer);
         setName(r.customer.name);
         setEmail(r.customer.email ?? "");
+        setBirthday(r.customer.birthday ?? "");
+        // "¿Cumple hoy?" se calcula al cargar (no en el render).
+        const today = new Date();
+        setIsBirthdayToday(
+          r.customer.birthday !== null &&
+            Number(r.customer.birthday.slice(5, 7)) === today.getMonth() + 1 &&
+            Number(r.customer.birthday.slice(8, 10)) === today.getDate(),
+        );
         setNext(nextAppointment(r.customer.appointments, Date.now()));
       })
       .catch(() => setData(null))
@@ -280,7 +290,11 @@ function CustomerCard({
     setBusy(true);
     setMsg(null);
     try {
-      await admin.updateCustomer(id, { name: name.trim(), email: email.trim() || null });
+      await admin.updateCustomer(id, {
+        name: name.trim(),
+        email: email.trim() || null,
+        birthday: birthday.trim() || null,
+      });
       setEditing(false);
       reload();
       onChanged();
@@ -332,6 +346,10 @@ function CustomerCard({
           <div className="flex-1 space-y-2 pr-3">
             <input value={name} onChange={(e) => setName(e.target.value)} className="field mt-0" placeholder="Nombre" />
             <input value={email} onChange={(e) => setEmail(e.target.value)} className="field mt-0" placeholder="Email (opcional)" />
+            <label className="block text-xs font-medium text-muted">
+              Cumpleaños (para felicitarle por WhatsApp)
+              <input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} className="field mt-1" />
+            </label>
           </div>
         ) : (
           <div>
@@ -348,6 +366,13 @@ function CustomerCard({
         <span className={"chip " + (data.wa_consent ? "bg-emerald-100 text-emerald-800" : "bg-zinc-200 text-zinc-600")}>
           WhatsApp {data.wa_consent ? "sí" : "no"}
         </span>
+        {isBirthdayToday ? (
+          <span className="chip bg-amber-100 text-amber-800">🎂 ¡Hoy es su cumpleaños!</span>
+        ) : data.birthday ? (
+          <span className="chip bg-brand-soft">
+            🎂 {new Date(data.birthday + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" })}
+          </span>
+        ) : null}
       </div>
 
       {next ? (
@@ -423,7 +448,7 @@ function CustomerCard({
         {editing ? (
           <>
             <button onClick={saveEdit} disabled={busy} className="btn-primary px-3 py-1.5 text-xs">Guardar</button>
-            <button onClick={() => { setEditing(false); setName(data.name); setEmail(data.email ?? ""); }} className="btn-ghost px-3 py-1.5 text-xs">Cancelar</button>
+            <button onClick={() => { setEditing(false); setName(data.name); setEmail(data.email ?? ""); setBirthday(data.birthday ?? ""); }} className="btn-ghost px-3 py-1.5 text-xs">Cancelar</button>
           </>
         ) : (
           <button onClick={() => setEditing(true)} className="btn-ghost px-3 py-1.5 text-xs">Editar</button>

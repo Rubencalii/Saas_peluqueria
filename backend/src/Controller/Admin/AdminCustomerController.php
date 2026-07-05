@@ -76,7 +76,7 @@ final class AdminCustomerController extends AdminController
     public function detail(int $id, Request $request): JsonResponse
     {
         $row = $this->db->fetchAssociative(
-            'SELECT id, name, phone, email, wa_consent, consent_at, created_at FROM customer WHERE id = ? AND account_id = ?',
+            'SELECT id, name, phone, email, wa_consent, consent_at, created_at, birthday FROM customer WHERE id = ? AND account_id = ?',
             [$id, self::user($request)['account_id']]
         );
         if ($row === false) {
@@ -99,6 +99,7 @@ final class AdminCustomerController extends AdminController
         $customer['consent_at'] = $row['consent_at'] !== null
             ? (new \DateTimeImmutable($row['consent_at']))->format('c')
             : null;
+        $customer['birthday'] = $row['birthday'] !== null ? (string) $row['birthday'] : null;
         $customer['appointments'] = array_map(static fn (array $a): array => [
             'appointment_id' => (int) $a['id'],
             'status' => (string) $a['status'],
@@ -142,9 +143,20 @@ final class AdminCustomerController extends AdminController
             $sets[] = 'email = ?';
             $params[] = $email === '' ? null : $email;
         }
+        if (array_key_exists('birthday', $payload)) {
+            $birthday = $payload['birthday'] !== null ? trim((string) $payload['birthday']) : null;
+            if ($birthday !== null && $birthday !== '') {
+                $d = \DateTimeImmutable::createFromFormat('!Y-m-d', $birthday);
+                if ($d === false || $d->format('Y-m-d') !== $birthday || $d > new \DateTimeImmutable('today')) {
+                    return $this->error('VALIDATION', 'Fecha de cumpleaños inválida (AAAA-MM-DD, no futura).', 400);
+                }
+            }
+            $sets[] = 'birthday = ?';
+            $params[] = $birthday === '' ? null : $birthday;
+        }
 
         if ($sets === []) {
-            return $this->error('VALIDATION', 'Nada que actualizar (name y/o email).', 400);
+            return $this->error('VALIDATION', 'Nada que actualizar (name, email y/o birthday).', 400);
         }
 
         $params[] = $id;

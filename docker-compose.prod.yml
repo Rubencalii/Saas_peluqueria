@@ -59,6 +59,9 @@ services:
           php bin/console app:notifications:return-reminders || true;
           php bin/console app:maintenance:purge && touch /tmp/purged-$$(date +%F) || true;
         fi;
+        if [ "$$(date +%H%M | cut -c1-2)" = "09" ] && [ ! -f /tmp/birthdays-$$(date +%F) ]; then
+          php bin/console app:notifications:birthdays && touch /tmp/birthdays-$$(date +%F) || true;
+        fi;
         sleep 300;
       done'
 

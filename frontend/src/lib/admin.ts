@@ -127,6 +127,7 @@ export interface CustomerList {
 
 export interface CustomerDetail extends CustomerListItem {
   consent_at: string | null;
+  birthday: string | null; // YYYY-MM-DD
   loyalty: {
     points: number;
     history: Array<{ points: number; reason: string; appointment_id: number | null; created_at: string }>;
@@ -564,7 +565,7 @@ export const admin = {
     ),
 
   customer: (id: number) => adminFetch<{ customer: CustomerDetail }>(`/api/v1/admin/customers/${id}`),
-  updateCustomer: (id: number, body: { name?: string; email?: string | null }) =>
+  updateCustomer: (id: number, body: { name?: string; email?: string | null; birthday?: string | null }) =>
     adminFetch<{ customer: CustomerDetail }>(`/api/v1/admin/customers/${id}`, { method: "PATCH", body }),
   exportCustomer: (id: number) => adminFetch<Record<string, unknown>>(`/api/v1/admin/customers/${id}/export`),
   anonymizeCustomer: (id: number) =>
