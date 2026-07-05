@@ -58,16 +58,22 @@
 - ✅ **Sesión deslizante** (renueva el token antes de caducar), **2FA TOTP** (RFC 6238 propio, alta en dos pasos, baja protegida; página `/panel/seguridad`), **PWA** del panel (manifest + iconos), **E2E en CI** (tercer job), suite **sin deprecaciones**.
 - ✅ Producto: **evolución mensual** en informes (12 meses), **convertir lista de espera** (marcar convertida + crear cita prerrellenada por URL), **export CSV de clientes** (filtro de consentimiento) y **Open Graph** por salón.
 
-## 4. Pendiente
+## 4. Hecho también (2026-07-05, tercera tanda — backlog de producto CERRADO)
 
-1. **MRR real vía Stripe**: los planes no tienen precio local (solo `stripe_price_id`); calcularlo exige consultar la API de Stripe con credenciales. Mostrar en la consola cuando haya claves.
+- ✅ **Bonos de sesiones** (doc 13): catálogo por cuenta, venta desde la ficha, canje automático e idempotente al completar citas (consume el más próximo a caducar; RLS en `pack`).
+- ✅ **Tarjetas regalo**: código legible `GIFT-XXXX-XXXX`, consulta tolerante al tecleo, canje por importe en caja con libro de movimientos (transaccional).
+- ✅ **Web pública en 3 idiomas (es/ca/en)**: cookie `lang` + SSR traducido, selector en cabecera, fechas por `Intl`, Stripe Elements en el idioma del visitante; test de paridad de claves entre idiomas.
+- ✅ README raíz reescrito al estado real.
+
+## 5. Pendiente (todo requiere recursos externos)
+
+1. **MRR real vía Stripe**: los planes no tienen precio local (solo `stripe_price_id`); exige credenciales de Stripe. Mostrar en la consola cuando haya claves.
 2. **CD/staging**: CI testea (unit + E2E) pero no despliega; el runbook de `deploy/README.md` es manual. Requiere servidor y secretos.
-3. **Uptime externo con alertas** (Sentry captura errores; nadie avisa si el host cae). Servicio externo tipo UptimeRobot contra `/api/v1/health`.
-4. **Backlog de producto** (sin compromiso, doc 13): bonos/packs y tarjetas regalo, multi-idioma (ca/en), series temporales más ricas, app del profesional.
+3. **Uptime externo con alertas** (Sentry captura errores; nadie avisa si el host cae). Servicio tipo UptimeRobot contra `/api/v1/health`.
 
 ---
 
-## 5. Cómo verificar (antes de cada commit)
+## 6. Cómo verificar (antes de cada commit)
 
 ```bash
 # BD de desarrollo/test (puerto 5446)
@@ -84,7 +90,7 @@ npm run lint && npx vitest run && npx next build
 - Las 2 deprecaciones de PHPUnit (`setNestTransactionsWithSavepoints` de Doctrine DBAL) son **preexistentes y conocidas**; la suite se considera verde con ellas.
 - Si la BD no responde: el contenedor `peluqueria_db` se para a veces; `docker compose up -d` y esperar `pg_isready`.
 
-## 6. Convenciones del repo
+## 7. Convenciones del repo
 
 - Commits **sin marca de agua** ni Co-Authored-By; autor `Ruben <rubencorralromero2018@gmail.com>`; push directo a `main` tras verificar.
 - Secretos reales **solo** en `.env.local` (gitignorado); los `.env*` commiteados llevan placeholders.
