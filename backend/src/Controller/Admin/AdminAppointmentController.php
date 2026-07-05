@@ -33,6 +33,7 @@ final class AdminAppointmentController extends AdminController
         private readonly AuthService $auth,
         private readonly NotificationService $notifications,
         private readonly \App\Service\Loyalty\LoyaltyService $loyalty,
+        private readonly \App\Service\Pack\PackService $packs,
     ) {
     }
 
@@ -112,9 +113,11 @@ final class AdminAppointmentController extends AdminController
             $params
         );
 
-        // Al completar la cita, abona los puntos de fidelización (idempotente).
+        // Al completar la cita: puntos de fidelización y canje de bono si el
+        // cliente tiene uno vivo del servicio (ambos idempotentes).
         if (($payload['status'] ?? null) === 'completada') {
             $this->loyalty->awardForCompletedAppointment($id);
+            $this->packs->redeemForAppointment($id);
         }
 
         return $this->json($this->detail($id));

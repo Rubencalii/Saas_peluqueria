@@ -715,6 +715,57 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses: { "200": { description: Cancelada } }
 
+  /api/v1/admin/packs:
+    get:
+      tags: [Panel]
+      summary: "Catálogo de bonos de la cuenta (con nº de vendidos)"
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Bonos } }
+    post:
+      tags: [Panel]
+      summary: "Crear bono (solo admins)"
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [service_id, name, sessions, price]
+              properties:
+                service_id: { type: integer }
+                name: { type: string }
+                sessions: { type: integer, minimum: 1 }
+                price: { type: number, minimum: 0 }
+                validity_days: { type: [integer, "null"], minimum: 1 }
+      responses: { "201": { description: Creado }, "400": { $ref: "#/components/responses/Error" }, "403": { $ref: "#/components/responses/Error" } }
+  /api/v1/admin/packs/{id}:
+    patch:
+      tags: [Panel]
+      summary: "Activar/desactivar un bono del catálogo (solo admins)"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [active], properties: { active: { type: boolean } } } } }
+      responses: { "200": { description: OK }, "404": { $ref: "#/components/responses/Error" } }
+  /api/v1/admin/customers/{id}/packs:
+    get:
+      tags: [Panel]
+      summary: "Bonos de un cliente (saldo y caducidad)"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Bonos }, "404": { $ref: "#/components/responses/Error" } }
+    post:
+      tags: [Panel]
+      summary: "Vender un bono al cliente (recepción y admins). El canje es automático al completar citas del servicio (idempotente por cita)."
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [pack_id], properties: { pack_id: { type: integer } } } } }
+      responses: { "201": { description: Vendido }, "404": { $ref: "#/components/responses/Error" } }
+
   /api/v1/admin/waitlist/{id}/convert:
     post:
       tags: [Panel]

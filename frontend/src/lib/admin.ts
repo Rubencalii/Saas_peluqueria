@@ -331,6 +331,29 @@ export interface MonthlyPoint {
   revenue: number;
 }
 
+export interface Pack {
+  id: number;
+  name: string;
+  sessions: number;
+  price: number;
+  validity_days: number | null;
+  active: boolean;
+  service_id: number;
+  service_name: string;
+  sold: number;
+}
+
+export interface CustomerPack {
+  id: number;
+  name: string;
+  service_id: number;
+  service_name: string;
+  sessions_total: number;
+  sessions_left: number;
+  expires_at: string | null;
+  sold_at: string;
+}
+
 export interface PanelTeamUser {
   id: number;
   name: string;
@@ -597,6 +620,18 @@ export const admin = {
   account: () => adminFetch<Account>("/api/v1/admin/account"),
 
   audit: (page: number) => adminFetch<AuditList>(`/api/v1/admin/audit?page=${page}&per_page=25`),
+
+  packs: () => adminFetch<{ packs: Pack[] }>("/api/v1/admin/packs"),
+  createPack: (body: { service_id: number; name: string; sessions: number; price: number; validity_days: number | null }) =>
+    adminFetch<{ id: number }>("/api/v1/admin/packs", { method: "POST", body }),
+  setPackActive: (id: number, active: boolean) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/packs/${id}`, { method: "PATCH", body: { active } }),
+  customerPacks: (id: number) => adminFetch<{ packs: CustomerPack[] }>(`/api/v1/admin/customers/${id}/packs`),
+  sellPack: (customerId: number, packId: number) =>
+    adminFetch<{ id: number }>(`/api/v1/admin/customers/${customerId}/packs`, {
+      method: "POST",
+      body: { pack_id: packId },
+    }),
 
   users: () => adminFetch<{ users: PanelTeamUser[] }>("/api/v1/admin/users"),
   createUser: (body: { name: string; email: string; password: string; role: string; location_id: number | null }) =>

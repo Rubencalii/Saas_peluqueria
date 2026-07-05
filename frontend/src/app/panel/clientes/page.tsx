@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { admin, type CustomerDetail, type CustomerList } from "@/lib/admin";
+import { admin, type CustomerDetail, type CustomerList, type CustomerPack, type Pack } from "@/lib/admin";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDateLong, formatTime } from "@/lib/format";
 import { nextAppointment } from "@/lib/dashboard";
@@ -213,12 +213,15 @@ function CustomerCard({
 }) {
   const [data, setData] = useState<CustomerDetail | null>(null);
   const [next, setNext] = useState<CustomerDetail["appointments"][number] | null>(null);
+  const [packs, setPacks] = useState<Array<CustomerPack & { expired: boolean }>>([]);
+  const [catalog, setCatalog] = useState<Pack[]>([]);
+  const [sellId, setSellId] = useState<number | "">("");
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -232,6 +235,14 @@ function CustomerCard({
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false));
+    admin
+      .customerPacks(id)
+      .then((r) => {
+        // "Caducado" se calcula aquí (momento de la carga), no en el render.
+        const now = Date.now();
+        setPacks(r.packs.map((p) => ({ ...p, expired: p.expires_at !== null && Date.parse(p.expires_at) < now })));
+      })
+      .catch(() => setPacks([]));
   }, [id]);
 
   useEffect(() => {
@@ -239,6 +250,30 @@ function CustomerCard({
     setMsg(null);
     reload();
   }, [reload]);
+
+  // Catálogo de bonos activos (para venderlos desde la ficha).
+  useEffect(() => {
+    admin
+      .packs()
+      .then((r) => setCatalog(r.packs.filter((p) => p.active)))
+      .catch(() => setCatalog([]));
+  }, []);
+
+  async function sell() {
+    if (sellId === "") return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await admin.sellPack(id, Number(sellId));
+      setSellId("");
+      reload();
+      setMsg({ ok: true, text: "Bono vendido." });
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "No se pudo vender el bono." });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveEdit() {
     if (name.trim() === "") return;
@@ -250,7 +285,7 @@ function CustomerCard({
       reload();
       onChanged();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "No se pudo guardar.");
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "No se pudo guardar." });
     } finally {
       setBusy(false);
     }
@@ -268,7 +303,7 @@ function CustomerCard({
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "No se pudo exportar.");
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "No se pudo exportar." });
     } finally {
       setBusy(false);
     }
@@ -282,7 +317,7 @@ function CustomerCard({
       await admin.anonymizeCustomer(id);
       onAnonymized();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "No se pudo anonimizar.");
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "No se pudo anonimizar." });
       setBusy(false);
     }
   }
@@ -327,7 +362,62 @@ function CustomerCard({
         </div>
       ) : null}
 
-      {msg ? <p className="mt-3 text-sm text-red-700">{msg}</p> : null}
+      {packs.length > 0 || catalog.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          <p className="text-sm font-semibold">Bonos</p>
+          {packs.map((p) => {
+            const spent = p.sessions_left === 0;
+            const expired = p.expired;
+            return (
+              <div
+                key={p.id}
+                className={
+                  "flex items-center justify-between rounded-xl bg-brand-soft/50 px-3 py-2 text-sm " +
+                  (spent || expired ? "opacity-60" : "")
+                }
+              >
+                <span>
+                  🎟️ <span className="font-medium">{p.name}</span>
+                  <span className="block text-xs text-muted">
+                    {p.service_name}
+                    {p.expires_at
+                      ? ` · ${expired ? "caducó" : "caduca"} ${new Date(p.expires_at).toLocaleDateString("es-ES")}`
+                      : ""}
+                  </span>
+                </span>
+                <span className={"font-semibold tabular-nums " + (spent ? "text-muted" : "")}>
+                  {p.sessions_left}/{p.sessions_total}
+                </span>
+              </div>
+            );
+          })}
+          {catalog.length > 0 ? (
+            <div className="flex gap-2">
+              <select
+                value={sellId}
+                onChange={(e) => setSellId(e.target.value === "" ? "" : Number(e.target.value))}
+                className="field mt-0 flex-1 text-sm"
+              >
+                <option value="">Vender un bono…</option>
+                {catalog.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} · {p.sessions} sesiones
+                  </option>
+                ))}
+              </select>
+              <button onClick={sell} disabled={busy || sellId === ""} className="btn-ghost px-3 py-1.5 text-xs">
+                Vender
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {msg ? (
+        <p className={"mt-3 rounded-xl px-3 py-2 text-sm " + (msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>
+          {msg.text}
+        </p>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {editing ? (
