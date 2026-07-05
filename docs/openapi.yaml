@@ -766,6 +766,49 @@ paths:
         content: { application/json: { schema: { type: object, required: [pack_id], properties: { pack_id: { type: integer } } } } }
       responses: { "201": { description: Vendido }, "404": { $ref: "#/components/responses/Error" } }
 
+  /api/v1/admin/gift-cards:
+    get:
+      tags: [Panel]
+      summary: "Últimas tarjetas regalo vendidas (recepción y admins)"
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Tarjetas } }
+    post:
+      tags: [Panel]
+      summary: "Vender tarjeta regalo (genera código GIFT-XXXX-XXXX)"
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: number, exclusiveMinimum: 0, maximum: 10000 }
+                recipient_name: { type: [string, "null"] }
+                validity_days: { type: [integer, "null"], minimum: 1 }
+      responses: { "201": { description: "{ id, code }" }, "400": { $ref: "#/components/responses/Error" } }
+  /api/v1/admin/gift-cards/{code}:
+    get:
+      tags: [Panel]
+      summary: "Saldo e historial por código (tolerante a minúsculas/espacios)"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Tarjeta }, "404": { $ref: "#/components/responses/Error" } }
+  /api/v1/admin/gift-cards/{code}/redeem:
+    post:
+      tags: [Panel]
+      summary: "Canjear importe contra el saldo (en caja)"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [amount], properties: { amount: { type: number, exclusiveMinimum: 0 } } } } }
+      responses:
+        "200": { description: "{ ok, balance }" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { description: "EXPIRED · INSUFFICIENT" }
+
   /api/v1/admin/waitlist/{id}/convert:
     post:
       tags: [Panel]

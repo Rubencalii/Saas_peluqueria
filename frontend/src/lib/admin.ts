@@ -354,6 +354,20 @@ export interface CustomerPack {
   sold_at: string;
 }
 
+export interface GiftCard {
+  code: string;
+  initial_amount: number;
+  balance: number;
+  recipient_name: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface GiftCardDetail extends GiftCard {
+  expired: boolean;
+  redemptions: Array<{ amount: number; redeemed_at: string; redeemed_by: string | null }>;
+}
+
 export interface PanelTeamUser {
   id: number;
   name: string;
@@ -620,6 +634,17 @@ export const admin = {
   account: () => adminFetch<Account>("/api/v1/admin/account"),
 
   audit: (page: number) => adminFetch<AuditList>(`/api/v1/admin/audit?page=${page}&per_page=25`),
+
+  giftCards: () => adminFetch<{ gift_cards: GiftCard[] }>("/api/v1/admin/gift-cards"),
+  sellGiftCard: (body: { amount: number; recipient_name?: string | null; validity_days?: number | null }) =>
+    adminFetch<{ id: number; code: string }>("/api/v1/admin/gift-cards", { method: "POST", body }),
+  giftCard: (code: string) =>
+    adminFetch<{ gift_card: GiftCardDetail }>(`/api/v1/admin/gift-cards/${encodeURIComponent(code)}`),
+  redeemGiftCard: (code: string, amount: number) =>
+    adminFetch<{ ok: boolean; balance: number }>(`/api/v1/admin/gift-cards/${encodeURIComponent(code)}/redeem`, {
+      method: "POST",
+      body: { amount },
+    }),
 
   packs: () => adminFetch<{ packs: Pack[] }>("/api/v1/admin/packs"),
   createPack: (body: { service_id: number; name: string; sessions: number; price: number; validity_days: number | null }) =>

@@ -13,6 +13,7 @@ const NAV: Array<{ href: string; label: string; icon: string; roles?: string[] }
   { href: "/panel/clientes", label: "Clientes", icon: "👥" },
   { href: "/panel/servicios", label: "Servicios", icon: "✂️" },
   { href: "/panel/bonos", label: "Bonos", icon: "🎟️", roles: ["admin_sede", "admin_cadena"] },
+  { href: "/panel/tarjetas", label: "Tarjetas regalo", icon: "🎁", roles: ["recepcion", "admin_sede", "admin_cadena"] },
   { href: "/panel/personal", label: "Personal", icon: "🧑‍💼" },
   { href: "/panel/bloqueos", label: "Bloqueos", icon: "🚫" },
   { href: "/panel/sedes", label: "Sedes", icon: "🏠" },
