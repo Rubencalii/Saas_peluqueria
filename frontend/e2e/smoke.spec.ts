@@ -53,3 +53,36 @@ test("login del panel y agenda", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Agenda", exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: "+ Nueva cita" })).toBeVisible();
 });
+
+test("alta manual de cita desde el panel", async ({ page }) => {
+  // Login.
+  await page.goto("/panel/login");
+  await page.getByLabel("Email").fill("admin@salon.es");
+  await page.getByLabel("Contraseña").fill("admin1234");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.waitForURL("**/panel");
+
+  // Ir a la agenda y abrir "Nueva cita".
+  await page.locator("aside nav").getByRole("link", { name: /Agenda/ }).click();
+  await page.getByRole("button", { name: "+ Nueva cita" }).click();
+
+  const form = page.locator(".card", { hasText: "Nueva cita" });
+  await expect(form).toBeVisible({ timeout: 15_000 });
+
+  // Servicio + día (lunes con agenda en el seed).
+  await form.getByLabel("Servicio").selectOption({ index: 1 });
+  await form.locator('input[type="date"]').fill(nextMonday());
+
+  // Primer hueco ofrecido.
+  const slot = form.locator("button.slot").first();
+  await expect(slot).toBeVisible({ timeout: 15_000 });
+  await slot.click();
+
+  // Cliente nuevo (modo por defecto) y crear.
+  await form.getByPlaceholder("Nombre del cliente").fill("Cliente Panel E2E");
+  await form.getByPlaceholder("Teléfono").fill("+34611" + String(Date.now()).slice(-6));
+  await form.getByRole("button", { name: "Crear cita" }).click();
+
+  // La cita aparece en el listado del día.
+  await expect(page.getByText("Cliente Panel E2E")).toBeVisible({ timeout: 15_000 });
+});
