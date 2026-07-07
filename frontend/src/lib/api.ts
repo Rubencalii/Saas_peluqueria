@@ -125,4 +125,22 @@ export const api = {
     request<{ ok: boolean }>(`/api/v1/appointments/${id}?code=${encodeURIComponent(code)}`, {
       method: "DELETE",
     }),
+
+  reviewContext: (id: number, code: string) =>
+    request<{
+      appointment: {
+        service_name: string;
+        location_name: string;
+        start: string;
+        timezone: string;
+        status: string;
+        already_reviewed: boolean;
+      };
+    }>(`/api/v1/appointments/${id}/review?code=${encodeURIComponent(code)}`, { revalidate: 0 }),
+
+  submitReview: (id: number, code: string, rating: number, comment: string | null) =>
+    request<{ review_id: number; google_review_url: string | null }>(`/api/v1/appointments/${id}/review`, {
+      method: "POST",
+      body: { code, rating, comment },
+    }),
 };

@@ -77,6 +77,8 @@ export interface AdminLocation {
   phone: string | null;
   timezone: string;
   active: boolean;
+  /** Enlace de reseñas de Google (se ofrece tras una valoración alta). */
+  google_review_url: string | null;
 }
 
 export interface LocationInput {
@@ -86,6 +88,7 @@ export interface LocationInput {
   phone: string | null;
   timezone: string;
   active: boolean;
+  google_review_url?: string | null;
 }
 
 export interface AgendaAppointment {

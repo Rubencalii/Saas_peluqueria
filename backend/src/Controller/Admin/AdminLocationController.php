@@ -38,7 +38,7 @@ final class AdminLocationController extends AdminController
         }
 
         $rows = $this->db->fetchAllAssociative(
-            'SELECT id, name, slug, address, phone, timezone, active FROM location WHERE account_id = ? ORDER BY name',
+            'SELECT id, name, slug, address, phone, timezone, active, google_review_url FROM location WHERE account_id = ? ORDER BY name',
             [self::user($request)['account_id']]
         );
 
@@ -50,6 +50,7 @@ final class AdminLocationController extends AdminController
             'phone' => $r['phone'] !== null ? (string) $r['phone'] : null,
             'timezone' => (string) $r['timezone'],
             'active' => (bool) $r['active'],
+            'google_review_url' => $r['google_review_url'] !== null ? (string) $r['google_review_url'] : null,
         ], $rows)]);
     }
 
@@ -119,6 +120,7 @@ final class AdminLocationController extends AdminController
             'phone' => static fn ($v) => $v !== null && $v !== '' ? (string) $v : null,
             'timezone' => static fn ($v) => (string) $v,
             'active' => static fn ($v) => (bool) $v,
+            'google_review_url' => static fn ($v) => $v !== null && trim((string) $v) !== '' ? trim((string) $v) : null,
         ];
         $sets = [];
         $params = [];

@@ -87,6 +87,7 @@ function LocationEditor({
   const [phone, setPhone] = useState(location?.phone ?? "");
   const [timezone, setTimezone] = useState(location?.timezone ?? "Europe/Madrid");
   const [active, setActive] = useState(location?.active ?? true);
+  const [googleUrl, setGoogleUrl] = useState(location?.google_review_url ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,6 +114,7 @@ function LocationEditor({
       phone: phone.trim() || null,
       timezone,
       active,
+      google_review_url: googleUrl.trim() || null,
     };
     try {
       if (location) await admin.updateLocation(location.id, body);
@@ -168,6 +170,18 @@ function LocationEditor({
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+        </label>
+        <label className="block text-sm font-semibold">
+          Enlace de reseñas de Google
+          <input
+            value={googleUrl}
+            onChange={(e) => setGoogleUrl(e.target.value)}
+            placeholder="https://g.page/r/…/review (opcional)"
+            className="field"
+          />
+          <span className="mt-1 block text-xs font-normal text-muted">
+            Tras una valoración de 4-5★ invitamos al cliente a dejarla también en Google.
+          </span>
         </label>
       </div>
 

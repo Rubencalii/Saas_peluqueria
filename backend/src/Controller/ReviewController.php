@@ -21,6 +21,18 @@ final class ReviewController extends AbstractController
     {
     }
 
+    /** Contexto para la página pública /valorar (verificado por código). */
+    #[Route('/api/v1/appointments/{id}/review', name: 'review_context', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function context(int $id, Request $request): JsonResponse
+    {
+        $ctx = $this->reviews->context($id, (string) $request->query->get('code', ''));
+        if ($ctx === null) {
+            return $this->json(['error' => ['code' => 'NOT_FOUND', 'message' => 'Cita no encontrada.']], 404);
+        }
+
+        return $this->json(['appointment' => $ctx]);
+    }
+
     #[Route('/api/v1/appointments/{id}/review', name: 'review_submit', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function submit(int $id, Request $request): JsonResponse
     {

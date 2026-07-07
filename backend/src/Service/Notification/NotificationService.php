@@ -74,6 +74,23 @@ final class NotificationService
         $this->schedule($this->db, $appointmentId, 'seguimiento', 'recordatorio_retorno', new \DateTimeImmutable('now'));
     }
 
+    /**
+     * Al COMPLETAR una cita: agradecimiento + enlace de valoración, un par de
+     * horas después (que al cliente le dé tiempo a llegar a casa). Idempotente:
+     * completar dos veces no programa dos mensajes.
+     */
+    public function onAppointmentCompleted(int $appointmentId): void
+    {
+        $this->db->executeStatement(
+            "INSERT INTO notification (appointment_id, type, status, template_name, scheduled_at)
+             SELECT ?, 'seguimiento', 'programada', 'cita_valoracion', now() + interval '2 hours'
+              WHERE NOT EXISTS (
+                    SELECT 1 FROM notification WHERE appointment_id = ? AND template_name = 'cita_valoracion'
+              )",
+            [$appointmentId, $appointmentId]
+        );
+    }
+
     private function scheduleReminder(Connection $tx, int $appointmentId): void
     {
         $start = $tx->fetchOne('SELECT start_at FROM appointment WHERE id = ?', [$appointmentId]);
@@ -112,7 +129,7 @@ final class NotificationService
      *
      * @param array{type: string, status: string, name: string, location_name: string,
      *              start_at: string, service_name: string, timezone: string,
-     *              template?: string, locale?: string} $ctx
+     *              template?: string, locale?: string, url?: string} $ctx
      */
     public function render(array $ctx): string
     {
@@ -125,17 +142,21 @@ final class NotificationService
             '{svc}' => $ctx['service_name'],
             '{fecha}' => $fecha,
             '{hora}' => $hora,
+            '{url}' => $ctx['url'] ?? '',
         ];
 
-        $key = ($ctx['template'] ?? '') === 'recordatorio_retorno'
-            ? 'retorno'
-            : match ($ctx['type']) {
+        $template = $ctx['template'] ?? '';
+        $key = match (true) {
+            $template === 'recordatorio_retorno' => 'retorno',
+            $template === 'cita_valoracion' => 'valoracion',
+            default => match ($ctx['type']) {
                 'confirmacion' => 'confirmacion',
                 'recordatorio' => 'recordatorio',
                 'seguimiento' => 'seguimiento',
                 'cambio' => $ctx['status'] === 'cancelada' ? 'cancelacion' : 'cambio',
                 default => 'generico',
-            };
+            },
+        };
 
         return strtr(self::TEMPLATES[$locale][$key], $repl);
     }
@@ -151,6 +172,9 @@ final class NotificationService
                 . "🗓️ {fecha} a las {hora} · {svc}\n¿Confirmas que vendrás? (responde \"menú\" para gestionarla)",
             'seguimiento' => "¡Gracias por tu visita, {name}! 💛 ¿Qué tal la experiencia en {loc}?\n"
                 . 'Escríbenos "menú" para reservar de nuevo cuando quieras.',
+            'valoracion' => "¡Gracias por tu visita, {name}! 💛 ¿Qué tal la experiencia en {loc}?\n"
+                . "Valóranos en un minuto: {url}\n"
+                . 'Y cuando quieras repetir, escríbenos "menú". ✂️',
             'cancelacion' => "Hola {name}, tu cita del {fecha} a las {hora} en {loc} ha sido cancelada.\n"
                 . 'Si quieres, escríbenos "menú" y te ayudamos a reubicarla.',
             'cambio' => "Hola {name}, tu cita en {loc} ha cambiado:\n🗓️ {fecha} a las {hora} · {svc}",
@@ -165,6 +189,9 @@ final class NotificationService
                 . "🗓️ {fecha} at {hora} · {svc}\nCan you make it? (reply \"menu\" to manage it)",
             'seguimiento' => "Thanks for your visit, {name}! 💛 How was your experience at {loc}?\n"
                 . 'Reply "menu" to book again whenever you like.',
+            'valoracion' => "Thanks for your visit, {name}! 💛 How was your experience at {loc}?\n"
+                . "Rate us in a minute: {url}\n"
+                . 'And whenever you fancy a repeat, reply "menu". ✂️',
             'cancelacion' => "Hi {name}, your appointment on {fecha} at {hora} at {loc} has been cancelled.\n"
                 . 'If you like, reply "menu" and we\'ll help you rebook.',
             'cambio' => "Hi {name}, your appointment at {loc} has changed:\n🗓️ {fecha} at {hora} · {svc}",

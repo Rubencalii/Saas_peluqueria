@@ -36,6 +36,7 @@ final class NotificationDispatchCommand extends Command
         private readonly NotificationService $notifications,
         private readonly WhatsAppMessenger $wa,
         private readonly \App\Service\Email\EmailSender $email,
+        private readonly string $appUrl,
     ) {
         parent::__construct();
     }
@@ -62,7 +63,8 @@ final class NotificationDispatchCommand extends Command
         $dryRun = (bool) $input->getOption('dry-run');
 
         $due = $this->db->fetchAllAssociative(
-            "SELECT n.id, n.type, n.template_name, a.status AS appointment_status, a.start_at,
+            "SELECT n.id, n.type, n.template_name, a.id AS appointment_id, a.public_code,
+                    a.status AS appointment_status, a.start_at,
                     c.name, c.phone, c.email, c.wa_consent,
                     s.name AS service_name, l.name AS location_name, l.timezone, ac.locale
                FROM notification n
@@ -111,6 +113,9 @@ final class NotificationDispatchCommand extends Command
                 'service_name' => (string) $n['service_name'],
                 'timezone' => (string) $n['timezone'],
                 'locale' => (string) $n['locale'],
+                // Enlace de valoración de la web pública (plantilla cita_valoracion).
+                'url' => rtrim($this->appUrl, '/') . '/valorar?cita=' . (int) $n['appointment_id']
+                    . '&code=' . (string) $n['public_code'],
             ]);
 
             $phone = (string) $n['phone'];

@@ -18,9 +18,11 @@ final class ReviewService
     }
 
     /**
-     * Registra una valoración. Una por cita, solo si está completada.
+     * Registra una valoración. Una por cita, solo si está completada. Con nota
+     * alta (>=4), devuelve además el enlace de reseñas de Google de la sede
+     * (si el salón lo configuró) para invitar al cliente a dejarla pública.
      *
-     * @return array{review_id: int}
+     * @return array{review_id: int, google_review_url: string|null}
      *
      * @throws ReviewException
      */
@@ -35,7 +37,9 @@ final class ReviewService
         }
 
         $appt = $this->db->fetchAssociative(
-            'SELECT id, status FROM appointment WHERE id = ? AND public_code = ?',
+            'SELECT a.id, a.status, l.google_review_url
+               FROM appointment a JOIN location l ON l.id = a.location_id
+              WHERE a.id = ? AND a.public_code = ?',
             [$appointmentId, $code]
         );
         if ($appt === false) {
@@ -54,7 +58,49 @@ final class ReviewService
             throw new ReviewException('ALREADY_REVIEWED', 'Esta cita ya tiene una valoración.', 409);
         }
 
-        return ['review_id' => (int) $id];
+        return [
+            'review_id' => (int) $id,
+            'google_review_url' => $rating >= 4 && $appt['google_review_url'] !== null
+                ? (string) $appt['google_review_url']
+                : null,
+        ];
+    }
+
+    /**
+     * Contexto para la página pública de valoración: qué cita es y en qué
+     * estado está (verificado por código, sin exponer datos de otros).
+     *
+     * @return array{service_name: string, location_name: string, start: string,
+     *               timezone: string, status: string, already_reviewed: bool}|null
+     */
+    public function context(int $appointmentId, string $code): ?array
+    {
+        $code = trim($code);
+        if ($code === '') {
+            return null;
+        }
+
+        $row = $this->db->fetchAssociative(
+            'SELECT a.status, a.start_at, s.name AS service_name, l.name AS location_name, l.timezone,
+                    EXISTS (SELECT 1 FROM review r WHERE r.appointment_id = a.id) AS reviewed
+               FROM appointment a
+               JOIN service  s ON s.id = a.service_id
+               JOIN location l ON l.id = a.location_id
+              WHERE a.id = ? AND a.public_code = ?',
+            [$appointmentId, $code]
+        );
+        if ($row === false) {
+            return null;
+        }
+
+        return [
+            'service_name' => (string) $row['service_name'],
+            'location_name' => (string) $row['location_name'],
+            'start' => (new \DateTimeImmutable($row['start_at']))->format('c'),
+            'timezone' => (string) $row['timezone'],
+            'status' => (string) $row['status'],
+            'already_reviewed' => (bool) $row['reviewed'],
+        ];
     }
 
     public function countForLocation(?int $locationId, int $accountId): int
