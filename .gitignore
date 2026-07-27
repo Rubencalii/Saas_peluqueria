@@ -16,6 +16,11 @@ backend/.env.*.local
 /backend/public/bundles/
 node_modules/
 
+# Salidas de Playwright (trazas, capturas, informe)
+test-results/
+playwright-report/
+.playwright/
+
 # Datos de Postgres si alguien monta el volumen como carpeta
 /db/pgdata/
 
