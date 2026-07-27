@@ -305,6 +305,15 @@ export interface CashClose {
   closed_by_name: string | null;
 }
 
+export interface CashMovement {
+  id: number;
+  /** entrada = se mete dinero en el cajón; gasto = sale. */
+  kind: "entrada" | "gasto";
+  amount: number;
+  concept: string;
+  created_by_name: string | null;
+}
+
 export interface CashCloseHistory {
   from: string;
   to: string;
@@ -331,6 +340,9 @@ export interface CashDay {
   by_method: Record<PaymentMethod | "sin_registrar", { count: number; amount: number }>;
   prepaid_by_method: Record<PaymentMethod | "sin_registrar", { count: number; amount: number }>;
   prepaid: PrepaidSale[];
+  movements: CashMovement[];
+  /** Entradas menos salidas: negativo si del cajón salió dinero. */
+  movements_net: number;
   appointments: Array<{
     appointment_id: number;
     start: string;
@@ -646,6 +658,16 @@ export const admin = {
 
   cashDay: (locationId: number, date: string) =>
     adminFetch<CashDay>(`/api/v1/admin/cash/day?location_id=${locationId}&date=${date}`),
+  addCashMovement: (body: {
+    location_id: number;
+    date: string;
+    kind: "entrada" | "gasto";
+    amount: number;
+    concept: string;
+  }) => adminFetch<{ id: number }>("/api/v1/admin/cash/movements", { method: "POST", body }),
+  deleteCashMovement: (id: number) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/cash/movements/${id}`, { method: "DELETE" }),
+
   cashCloses: (locationId: number) =>
     adminFetch<CashCloseHistory>(`/api/v1/admin/cash/closes?location_id=${locationId}`),
   setPrepaidPayment: (kind: "gift_card" | "pack", id: number, method: PaymentMethod | null) =>

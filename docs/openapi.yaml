@@ -610,6 +610,23 @@ paths:
         - { name: date, in: query, schema: { type: string, format: date } }
       responses: { "200": { description: "{ total, expected_cash, by_method, appointments[], close }" }, "400": { description: Falta la sede o la fecha es inválida } }
 
+  /api/v1/admin/cash/movements:
+    post:
+      tags: [Panel]
+      summary: Apuntar una entrada o salida de efectivo
+      description: "entrada = dinero que se mete en el cajón (fondo de cambio); gasto = dinero que sale. Van por sede y día natural y mueven el efectivo esperado."
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [location_id, date, kind, amount, concept], properties: { location_id: { type: integer }, date: { type: string, format: date }, kind: { type: string, enum: [entrada, gasto] }, amount: { type: number, exclusiveMinimum: 0 }, concept: { type: string } } } } } }
+      responses: { "201": { description: "{ id }" }, "400": { description: Importe, concepto o tipo inválidos } }
+
+  /api/v1/admin/cash/movements/{id}:
+    delete:
+      tags: [Panel]
+      summary: Borrar un movimiento de caja
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Borrado }, "404": { description: No encontrado en la cuenta } }
+
   /api/v1/admin/cash/closes:
     get:
       tags: [Panel]

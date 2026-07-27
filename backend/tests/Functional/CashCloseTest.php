@@ -185,6 +185,74 @@ final class CashCloseTest extends WebTestCase
         self::assertSame($precio, round((float) $cierre['expected_cash'], 2));
     }
 
+    public function testLasEntradasYGastosMuevenElEfectivoEsperado(): void
+    {
+        $token = $this->login();
+        $monday = (new \DateTimeImmutable('next monday'))->format('Y-m-d');
+        [$appt, $precio] = $this->citaCompletada($token, $monday, '+34600991006');
+        $this->cobrar($token, $appt, 'efectivo');
+
+        // Fondo de cambio: entra en el cajón.
+        $this->post('/api/v1/admin/cash/movements', $token, [
+            'location_id' => 1, 'date' => $monday,
+            'kind' => 'entrada', 'amount' => 50, 'concept' => 'Fondo de cambio',
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+
+        // Gasto en metálico: sale del cajón.
+        $this->post('/api/v1/admin/cash/movements', $token, [
+            'location_id' => 1, 'date' => $monday,
+            'kind' => 'gasto', 'amount' => 12.5, 'concept' => 'Mensajero',
+        ]);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        $gastoId = (int) json_decode((string) $this->client->getResponse()->getContent(), true)['id'];
+
+        $caja = $this->getJson("/api/v1/admin/cash/day?location_id=1&date={$monday}", $token);
+        self::assertSame(round($precio + 50 - 12.5, 2), round((float) $caja['expected_cash'], 2));
+        self::assertSame(37.5, round((float) $caja['movements_net'], 2));
+        self::assertCount(2, $caja['movements']);
+
+        // El cierre usa el mismo esperado que la pantalla.
+        $this->post('/api/v1/admin/cash/close', $token, [
+            'location_id' => 1, 'date' => $monday, 'counted_cash' => $precio + 50 - 12.5,
+        ]);
+        $cierre = json_decode((string) $this->client->getResponse()->getContent(), true)['close'];
+        self::assertSame(0.0, round((float) $cierre['difference'], 2));
+
+        // Borrar el gasto lo devuelve al cajón.
+        $this->client->request('DELETE', "/api/v1/admin/cash/movements/{$gastoId}", server: $this->auth($token));
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        $caja = $this->getJson("/api/v1/admin/cash/day?location_id=1&date={$monday}", $token);
+        self::assertSame(round($precio + 50, 2), round((float) $caja['expected_cash'], 2));
+
+        // Validaciones: importe y concepto son obligatorios, kind acotado.
+        foreach ([
+            ['kind' => 'gasto', 'amount' => 0, 'concept' => 'Nada'],
+            ['kind' => 'gasto', 'amount' => 5, 'concept' => '  '],
+            ['kind' => 'traspaso', 'amount' => 5, 'concept' => 'Otro'],
+        ] as $malo) {
+            $this->post('/api/v1/admin/cash/movements', $token, ['location_id' => 1, 'date' => $monday] + $malo);
+            self::assertSame(400, $this->client->getResponse()->getStatusCode(), (string) json_encode($malo));
+        }
+
+        // Un movimiento de otra cuenta no se borra.
+        $otra = (int) $this->db->fetchOne(
+            "INSERT INTO account (name, slug, status) VALUES ('Otra Mov', 'otra-mov', 'active') RETURNING id"
+        );
+        $locAjena = (int) $this->db->fetchOne(
+            "INSERT INTO location (account_id, name, slug, timezone, active)
+             VALUES (?, 'Ajena Mov', 'ajena-mov', 'Europe/Madrid', TRUE) RETURNING id",
+            [$otra]
+        );
+        $ajeno = (int) $this->db->fetchOne(
+            "INSERT INTO cash_movement (account_id, location_id, business_date, kind, amount, concept)
+             VALUES (?, ?, ?, 'gasto', 9, 'Ajeno') RETURNING id",
+            [$otra, $locAjena, $monday]
+        );
+        $this->client->request('DELETE', "/api/v1/admin/cash/movements/{$ajeno}", server: $this->auth($token));
+        self::assertSame(404, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testElHistoricoResumeLosDescuadres(): void
     {
         $token = $this->login();

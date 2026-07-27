@@ -16,9 +16,10 @@ use Symfony\Component\Routing\Attribute\Route;
  * cómo, y arqueo al cerrar. Es trabajo de mostrador, así que también lo usa
  * recepción.
  *
- * En el cajón hay dos cosas: los servicios cobrados en efectivo y los
- * prepagos (bonos y tarjetas regalo) vendidos en efectivo. Una cita pagada
- * con 'bono' o 'regalo' NO suma dinero: se cobró el día de la venta.
+ * En el cajón hay tres cosas: los servicios cobrados en efectivo, los prepagos
+ * (bonos y tarjetas regalo) vendidos en efectivo y los movimientos apuntados a
+ * mano (fondo de cambio que entra, gastos que salen). Una cita pagada con
+ * 'bono' o 'regalo' NO suma dinero: se cobró el día de la venta.
  */
 final class AdminCashController extends AdminController
 {
@@ -90,20 +91,99 @@ final class AdminCashController extends AdminController
             $prepaidTotal = round($prepaidTotal + $p['amount'], 2);
         }
 
+        $movements = $this->movementsOfDay($locationId, $date);
+
         return $this->json([
             'location_id' => $locationId,
             'date' => $date,
             'total' => $total,
             'prepaid_total' => $prepaidTotal,
+            'movements' => $movements,
+            // Neto de entradas y salidas del cajón (negativo si salió dinero).
+            'movements_net' => round(array_sum(array_map(
+                static fn (array $m): float => 'entrada' === $m['kind'] ? $m['amount'] : -$m['amount'],
+                $movements
+            )), 2),
             // Se calcula con el mismo helper que usa el cierre: la pantalla y el
             // arqueo no pueden discrepar.
-            'expected_cash' => $this->expectedCash($locationId, $fromUtc, $toUtc),
+            'expected_cash' => $this->expectedCash($locationId, $date, $fromUtc, $toUtc),
             'by_method' => $byMethod,
             'prepaid_by_method' => $prepaidByMethod,
             'appointments' => $rows,
             'prepaid' => $prepaid,
             'close' => $this->closeOf($locationId, $date),
         ]);
+    }
+
+    /**
+     * Apunta una entrada o una salida de efectivo del cajón (migración 0031).
+     * Body: { location_id, date, kind: 'entrada'|'gasto', amount, concept }
+     */
+    #[Route('/api/v1/admin/cash/movements', name: 'admin_cash_movement_create', methods: ['POST'])]
+    public function createMovement(Request $request): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
+        }
+
+        $ctx = $this->context($request, $payload);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
+        [$locationId, $date] = $ctx;
+
+        $kind = $payload['kind'] ?? '';
+        $amount = $payload['amount'] ?? null;
+        $concept = trim((string) ($payload['concept'] ?? ''));
+        if (!in_array($kind, ['entrada', 'gasto'], true)) {
+            return $this->error('VALIDATION', 'kind debe ser entrada o gasto.', 400);
+        }
+        if (!is_numeric($amount) || (float) $amount <= 0) {
+            return $this->error('VALIDATION', 'El importe debe ser mayor que 0.', 400);
+        }
+        if ($concept === '') {
+            return $this->error('VALIDATION', 'Escribe el concepto del movimiento.', 400);
+        }
+
+        $user = self::user($request);
+        $id = (int) $this->db->fetchOne(
+            'INSERT INTO cash_movement (account_id, location_id, business_date, kind, amount, concept, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+            [$user['account_id'], $locationId, $date, (string) $kind, round((float) $amount, 2), $concept, $user['id']]
+        );
+
+        return $this->json(['id' => $id], 201);
+    }
+
+    #[Route('/api/v1/admin/cash/movements/{id}', name: 'admin_cash_movement_delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+    public function deleteMovement(int $id, Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        try {
+            $this->auth->assertRole($user, self::ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        // La sede se comprueba además del tenant: un admin_sede no borra
+        // movimientos de la caja de otra sede.
+        $locationId = $this->db->fetchOne(
+            'SELECT location_id FROM cash_movement WHERE id = ? AND account_id = ?',
+            [$id, $user['account_id']]
+        );
+        if ($locationId === false) {
+            return $this->error('NOT_FOUND', 'Movimiento no encontrado.', 404);
+        }
+        try {
+            $this->auth->assertLocation($user, (int) $locationId);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        $this->db->executeStatement('DELETE FROM cash_movement WHERE id = ?', [$id]);
+
+        return $this->json(['ok' => true]);
     }
 
     /**
@@ -282,7 +362,7 @@ final class AdminCashController extends AdminController
         }
 
         [$fromUtc, $toUtc] = $this->dayBounds($date, $tz);
-        $expected = $this->expectedCash($locationId, $fromUtc, $toUtc);
+        $expected = $this->expectedCash($locationId, $date, $fromUtc, $toUtc);
 
         $user = self::user($request);
         $this->db->executeStatement(
@@ -306,10 +386,34 @@ final class AdminCashController extends AdminController
     }
 
     /**
-     * Lo que debería haber en el cajón: servicios cobrados en efectivo más
-     * prepagos vendidos en efectivo en esa sede.
+     * Entradas y salidas de efectivo apuntadas ese día en esa sede.
+     *
+     * @return list<array{id: int, kind: string, amount: float, concept: string, created_by_name: string|null}>
      */
-    private function expectedCash(int $locationId, string $fromUtc, string $toUtc): float
+    private function movementsOfDay(int $locationId, string $date): array
+    {
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT m.id, m.kind, m.amount, m.concept, u.name AS created_by_name
+               FROM cash_movement m LEFT JOIN app_user u ON u.id = m.created_by
+              WHERE m.location_id = ? AND m.business_date = ?
+              ORDER BY m.created_at',
+            [$locationId, $date]
+        );
+
+        return array_map(static fn (array $r): array => [
+            'id' => (int) $r['id'],
+            'kind' => (string) $r['kind'],
+            'amount' => round((float) $r['amount'], 2),
+            'concept' => (string) $r['concept'],
+            'created_by_name' => $r['created_by_name'] !== null ? (string) $r['created_by_name'] : null,
+        ], $rows);
+    }
+
+    /**
+     * Lo que debería haber en el cajón: servicios y prepagos cobrados en
+     * efectivo, más las entradas apuntadas y menos las salidas.
+     */
+    private function expectedCash(int $locationId, string $date, string $fromUtc, string $toUtc): float
     {
         $servicios = (float) $this->db->fetchOne(
             "SELECT COALESCE(SUM(COALESCE(sl.price_override, s.price, 0)), 0)
@@ -328,7 +432,12 @@ final class AdminCashController extends AdminController
             }
         }
 
-        return round($servicios + $prepagos, 2);
+        $movimientos = 0.0;
+        foreach ($this->movementsOfDay($locationId, $date) as $m) {
+            $movimientos += 'entrada' === $m['kind'] ? $m['amount'] : -$m['amount'];
+        }
+
+        return round($servicios + $prepagos + $movimientos, 2);
     }
 
     /**

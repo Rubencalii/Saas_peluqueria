@@ -184,6 +184,8 @@ export default function CajaPage() {
             )}
           </section>
 
+          <Movimientos data={data} locationId={locationId!} date={date} onChanged={load} />
+
           <Arqueo data={data} onClosed={load} locationId={locationId!} date={date} />
 
           <Historico locationId={locationId!} recargar={data.close?.closed_at ?? null} />
@@ -227,6 +229,150 @@ export default function CajaPage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Entradas y salidas de efectivo del cajón: el fondo de cambio con el que se
+ * abre y lo que se paga en metálico durante el día. Sin esto el arqueo nunca
+ * cuadra.
+ */
+function Movimientos({
+  data,
+  locationId,
+  date,
+  onChanged,
+}: {
+  data: CashDay;
+  locationId: number;
+  date: string;
+  onChanged: () => Promise<void>;
+}) {
+  const [kind, setKind] = useState<"entrada" | "gasto">("gasto");
+  const [amount, setAmount] = useState("");
+  const [concept, setConcept] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function añadir() {
+    const importe = Number(amount.trim().replace(",", "."));
+    if (!Number.isFinite(importe) || importe <= 0) {
+      setError("El importe debe ser mayor que 0.");
+      return;
+    }
+    if (concept.trim() === "") {
+      setError("Escribe el concepto (por ejemplo, Mensajero).");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await admin.addCashMovement({ location_id: locationId, date, kind, amount: importe, concept: concept.trim() });
+      setAmount("");
+      setConcept("");
+      await onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo apuntar el movimiento.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function quitar(id: number) {
+    setBusy(true);
+    setError(null);
+    try {
+      await admin.deleteCashMovement(id);
+      await onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo borrar el movimiento.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card space-y-4 p-5">
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Entradas y salidas de efectivo
+          {data.movements.length > 0 ? ` (${formatPrice(data.movements_net)})` : ""}
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          El fondo de cambio con el que abres y lo que pagas en metálico durante el día.
+        </p>
+      </div>
+
+      {data.movements.length > 0 ? (
+        <table className="w-full text-sm">
+          <tbody>
+            {data.movements.map((m) => (
+              <tr key={m.id} className="border-b border-border/50 last:border-0">
+                <td className="py-2 pr-3">
+                  <span className={"chip " + (m.kind === "entrada" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>
+                    {m.kind === "entrada" ? "entrada" : "gasto"}
+                  </span>
+                </td>
+                <td className="py-2 pr-3 font-medium">{m.concept}</td>
+                <td className="py-2 pr-3 text-right font-semibold tabular-nums">
+                  {m.kind === "entrada" ? "+" : "−"}
+                  {formatPrice(m.amount)}
+                </td>
+                <td className="py-2 pr-3 text-xs text-muted">{m.created_by_name ?? ""}</td>
+                <td className="py-2 text-right">
+                  <button
+                    onClick={() => quitar(m.id)}
+                    disabled={busy}
+                    aria-label={`Quitar ${m.concept}`}
+                    className="text-muted hover:text-red-700"
+                  >
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-sm font-semibold">
+          Tipo
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as "entrada" | "gasto")}
+            className="field mt-1 w-28"
+          >
+            <option value="gasto">Gasto</option>
+            <option value="entrada">Entrada</option>
+          </select>
+        </label>
+        <label className="text-sm font-semibold">
+          Importe
+          <input
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            inputMode="decimal"
+            placeholder="0,00"
+            className="field mt-1 w-28"
+          />
+        </label>
+        <label className="min-w-48 flex-1 text-sm font-semibold">
+          Concepto
+          <input
+            value={concept}
+            onChange={(e) => setConcept(e.target.value)}
+            placeholder="Mensajero, material, fondo de cambio…"
+            className="field mt-1"
+          />
+        </label>
+        <button onClick={añadir} disabled={busy} className="btn-ghost px-4 py-2.5">
+          Apuntar
+        </button>
+      </div>
+
+      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+    </section>
   );
 }
 
@@ -282,7 +428,7 @@ function Arqueo({
         <p className="mt-2 text-sm text-muted">
           En el cajón debería haber{" "}
           <span className="font-semibold text-foreground">{formatPrice(data.expected_cash)}</span>: lo cobrado en
-          efectivo, servicios y prepagos vendidos hoy.
+          efectivo (servicios y prepagos de hoy) con las entradas y salidas ya aplicadas.
         </p>
       </div>
 

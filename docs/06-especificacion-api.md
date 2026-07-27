@@ -96,6 +96,8 @@ GET    /api/v1/admin/cash/day?location_id=&date=
 POST   /api/v1/admin/cash/close
 GET    /api/v1/admin/cash/closes?location_id=&from=&to=
 PATCH  /api/v1/admin/cash/prepaid
+POST   /api/v1/admin/cash/movements
+DELETE /api/v1/admin/cash/movements/{id}
 
 # Clientes
 GET    /api/v1/admin/customers?query=
