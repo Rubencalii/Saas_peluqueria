@@ -6,6 +6,7 @@ import {
   type AdminLocation,
   type MonthlyPoint,
   type ReportChannel,
+  type ReportCommissions,
   type ReportOccupancy,
   type ReportPeak,
   type ReportRatings,
@@ -49,6 +50,7 @@ export default function InformesPage() {
   const [noShows, setNoShows] = useState<ReportNoShows | null>(null);
   const [retention, setRetention] = useState<ReportRetention | null>(null);
   const [ratings, setRatings] = useState<ReportRatings | null>(null);
+  const [commissions, setCommissions] = useState<ReportCommissions | null>(null);
   const [occupancy, setOccupancy] = useState<ReportOccupancy | null>(null);
   const [peak, setPeak] = useState<ReportPeak | null>(null);
   const [prev, setPrev] = useState<PrevKpis | null>(null);
@@ -73,12 +75,13 @@ export default function InformesPage() {
     // Mismo rango justo anterior, para dar contexto a los KPIs (¿mejor o peor?).
     const prevRange = previousRange(from, to);
     const prevScope = prevRange ? { location_id: locationId, from: prevRange.from, to: prevRange.to } : null;
-    const [rev, ch, ns, ret, rat, pRev, pNs, pRet, pRat] = await Promise.all([
+    const [rev, ch, ns, ret, rat, com, pRev, pNs, pRet, pRat] = await Promise.all([
       admin.reportRevenue(scope).catch(() => null),
       admin.reportChannel(scope).catch(() => null),
       admin.reportNoShows(scope).catch(() => null),
       admin.reportRetention(scope).catch(() => null),
       admin.reportRatings(scope).catch(() => null),
+      admin.reportCommissions(scope).catch(() => null),
       prevScope ? admin.reportRevenue(prevScope).catch(() => null) : Promise.resolve(null),
       prevScope ? admin.reportNoShows(prevScope).catch(() => null) : Promise.resolve(null),
       prevScope ? admin.reportRetention(prevScope).catch(() => null) : Promise.resolve(null),
@@ -89,6 +92,7 @@ export default function InformesPage() {
     setNoShows(ns);
     setRetention(ret);
     setRatings(rat);
+    setCommissions(com);
     setPrev(prevScope ? { revenue: pRev, noShows: pNs, retention: pRet, ratings: pRat } : null);
     // Ocupación y horas punta requieren una sede concreta.
     if (locationId) {
@@ -110,7 +114,7 @@ export default function InformesPage() {
   }, [load]);
 
   function exportCsv() {
-    const rows = reportCsvRows({ from, to, revenue, channel, noShows, retention, ratings, occupancy, peak });
+    const rows = reportCsvRows({ from, to, revenue, channel, noShows, retention, ratings, occupancy, peak, commissions });
     downloadCsv(`informe_${from}_${to}.csv`, toCsv(["Concepto", "Valor", ""], rows));
   }
 
@@ -226,6 +230,30 @@ export default function InformesPage() {
             <Section title="Ingresos por profesional">
               <Table
                 rows={revenue.by_staff.map((r) => [r.staff_name ?? "Sin asignar", `${r.appointments} citas`, formatPrice(r.revenue)])}
+              />
+            </Section>
+          ) : null}
+
+          {commissions && commissions.by_staff.length > 0 ? (
+            <Section title="Comisiones del personal">
+              {commissions.total_commission === 0 ? (
+                <p className="mb-3 text-sm text-muted">
+                  Aún no hay comisiones configuradas. Se definen en <strong>Personal</strong>, en la ficha de cada profesional.
+                </p>
+              ) : (
+                <p className="mb-3 text-sm text-muted">
+                  A repartir:{" "}
+                  <span className="font-semibold text-foreground">{formatPrice(commissions.total_commission)}</span> sobre{" "}
+                  {formatPrice(commissions.total_revenue)} facturados.
+                </p>
+              )}
+              <Table
+                rows={commissions.by_staff.map((r) => [
+                  r.staff_name ?? "Sin asignar",
+                  `${r.appointments} citas · ${formatPrice(r.revenue)}`,
+                  r.effective_rate_pct !== null ? `${r.effective_rate_pct.toFixed(1)} %` : "—",
+                  formatPrice(r.commission),
+                ])}
               />
             </Section>
           ) : null}

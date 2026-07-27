@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pctDelta, ppDelta, previousRange, reportCsvRows, type ReportBundle } from "./reports";
-import type { ReportChannel, ReportOccupancy, ReportPeak, ReportRevenue } from "./admin";
+import type { ReportChannel, ReportCommissions, ReportOccupancy, ReportPeak, ReportRevenue } from "./admin";
 
 type Cell = string | number | null;
 
@@ -21,6 +21,35 @@ const occupancy: ReportOccupancy = {
   by_staff: [{ staff_id: 1, staff_name: "Ana", booked_minutes: 600, appointments: 10 }],
 };
 const peak: ReportPeak = { timezone: "Europe/Madrid", slots: [{ weekday: 0, hour: 10, appointments: 3 }] };
+const commissions: ReportCommissions = {
+  total_revenue: 200,
+  total_commission: 70,
+  by_staff: [
+    { staff_id: 1, staff_name: "Ana", appointments: 4, revenue: 200, commission: 70, effective_rate_pct: 35 },
+  ],
+  detail: [
+    {
+      staff_id: 1,
+      staff_name: "Ana",
+      service_id: 2,
+      service_name: "Corte",
+      appointments: 2,
+      revenue: 100,
+      rate_pct: 20,
+      commission: 20,
+    },
+    {
+      staff_id: 1,
+      staff_name: "Ana",
+      service_id: 3,
+      service_name: "Tinte",
+      appointments: 2,
+      revenue: 100,
+      rate_pct: 50,
+      commission: 50,
+    },
+  ],
+};
 
 function bundle(over: Partial<ReportBundle> = {}): ReportBundle {
   return {
@@ -33,6 +62,7 @@ function bundle(over: Partial<ReportBundle> = {}): ReportBundle {
     ratings: null,
     occupancy: null,
     peak: null,
+    commissions: null,
     ...over,
   };
 }
@@ -71,6 +101,22 @@ describe("reportCsvRows", () => {
     const rows = reportCsvRows(bundle({ peak }));
     expect(hasRow(rows, ["Horas punta", "Hora", "Citas"])).toBe(true);
     expect(hasRow(rows, ["Lun", "10h", 3])).toBe(true);
+  });
+
+  it("vuelca las comisiones por profesional y su detalle por servicio", () => {
+    const rows = reportCsvRows(bundle({ commissions }));
+    expect(hasRow(rows, ["Comisiones por profesional", "Citas", "Ingresos €", "% medio", "Comisión €"])).toBe(true);
+    expect(hasRow(rows, ["Ana", 4, 200, 35, 70])).toBe(true);
+    expect(hasRow(rows, ["Total comisiones", "", 200, "", 70])).toBe(true);
+    // El detalle justifica cada línea con el % aplicado a ese servicio.
+    expect(hasRow(rows, ["Ana", "Corte", 2, 100, 20, 20])).toBe(true);
+    expect(hasRow(rows, ["Ana", "Tinte", 2, 100, 50, 50])).toBe(true);
+  });
+
+  it("omite las comisiones cuando no hay profesionales con actividad", () => {
+    const vacio: ReportCommissions = { total_revenue: 0, total_commission: 0, by_staff: [], detail: [] };
+    const rows = reportCsvRows(bundle({ commissions: vacio }));
+    expect(hasRow(rows, ["Comisiones por profesional", "Citas", "Ingresos €", "% medio", "Comisión €"])).toBe(false);
   });
 
   it("omite ocupación y horas punta cuando son null (sin sede)", () => {

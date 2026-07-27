@@ -292,6 +292,38 @@ export interface ReportChannel {
   total: number;
 }
 
+export interface CommissionLine {
+  staff_id: number | null;
+  staff_name: string | null;
+  service_id: number;
+  service_name: string;
+  appointments: number;
+  revenue: number;
+  rate_pct: number;
+  commission: number;
+}
+
+export interface ReportCommissions {
+  total_revenue: number;
+  total_commission: number;
+  by_staff: Array<{
+    staff_id: number | null;
+    staff_name: string | null;
+    appointments: number;
+    revenue: number;
+    commission: number;
+    effective_rate_pct: number | null;
+  }>;
+  detail: CommissionLine[];
+}
+
+export interface StaffCommissions {
+  staff_id: number;
+  /** Tarifa que se aplica a los servicios sin excepción propia. */
+  default_rate_pct: number | null;
+  by_service: Array<{ service_id: number; service_name: string; rate_pct: number }>;
+}
+
 export interface ReportNoShows {
   no_shows: number;
   completed: number;
@@ -603,7 +635,20 @@ export const admin = {
       body: { location_id: locationId, entries },
     }),
 
+  staffCommissions: (id: number) =>
+    adminFetch<StaffCommissions>(`/api/v1/admin/staff/${id}/commissions`),
+  setStaffCommissions: (
+    id: number,
+    defaultRatePct: number | null,
+    byService: Array<{ service_id: number; rate_pct: number }>,
+  ) =>
+    adminFetch<{ ok: boolean }>(`/api/v1/admin/staff/${id}/commissions`, {
+      method: "POST",
+      body: { default_rate_pct: defaultRatePct, by_service: byService },
+    }),
+
   reportRevenue: (s: ReportScope) => adminFetch<ReportRevenue>(`/api/v1/admin/reports/revenue?${reportQuery(s)}`),
+  reportCommissions: (s: ReportScope) => adminFetch<ReportCommissions>(`/api/v1/admin/reports/commissions?${reportQuery(s)}`),
   reportChannel: (s: ReportScope) => adminFetch<ReportChannel>(`/api/v1/admin/reports/bookings-by-channel?${reportQuery(s)}`),
   reportNoShows: (s: ReportScope) => adminFetch<ReportNoShows>(`/api/v1/admin/reports/no-shows?${reportQuery(s)}`),
   reportRetention: (s: ReportScope) => adminFetch<ReportRetention>(`/api/v1/admin/reports/retention?${reportQuery(s)}`),

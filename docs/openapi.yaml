@@ -598,6 +598,22 @@ paths:
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [location_id], properties: { location_id: { type: integer }, entries: { type: array, items: { type: object, properties: { weekday: { type: integer }, start_time: { type: string }, end_time: { type: string } } } } } } } } }
       responses: { "200": { description: Guardado } }
 
+  /api/v1/admin/staff/{id}/commissions:
+    get:
+      tags: [Panel]
+      summary: Comisiones del profesional
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: "{ default_rate_pct, by_service[] }" } }
+    post:
+      tags: [Panel]
+      summary: Reemplazar las comisiones del profesional
+      description: "default_rate_pct es la tarifa general (null = sin comisión); by_service son las excepciones, que mandan sobre ella."
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { default_rate_pct: { type: number, nullable: true, minimum: 0, maximum: 100 }, by_service: { type: array, items: { type: object, required: [service_id, rate_pct], properties: { service_id: { type: integer }, rate_pct: { type: number, minimum: 0, maximum: 100 } } } } } } } } }
+      responses: { "200": { description: Guardado }, "400": { description: Porcentaje fuera de 0-100 } }
+
   /api/v1/admin/staff/{id}/calendar:
     get:
       tags: [Panel]
@@ -828,6 +844,8 @@ paths:
     get: { tags: [Panel], summary: "Reservas por canal", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
   /api/v1/admin/reports/revenue:
     get: { tags: [Panel], summary: "Ingresos por profesional/servicio", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+  /api/v1/admin/reports/commissions:
+    get: { tags: [Panel], summary: "Comisiones a liquidar por profesional (con detalle por servicio)", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
   /api/v1/admin/reports/peak-hours:
     get: { tags: [Panel], summary: "Horas punta (día/hora)", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
   /api/v1/admin/reports/retention:

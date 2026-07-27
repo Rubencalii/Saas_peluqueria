@@ -4,6 +4,7 @@
 
 import type {
   ReportChannel,
+  ReportCommissions,
   ReportNoShows,
   ReportOccupancy,
   ReportPeak,
@@ -53,6 +54,7 @@ export interface ReportBundle {
   ratings: ReportRatings | null;
   occupancy: ReportOccupancy | null;
   peak: ReportPeak | null;
+  commissions: ReportCommissions | null;
 }
 
 type Cell = string | number | null;
@@ -86,6 +88,29 @@ export function reportCsvRows(b: ReportBundle): Cell[][] {
   rows.push([]);
   rows.push(["Ingresos por profesional", "Citas", "€"]);
   for (const r of b.revenue?.by_staff ?? []) rows.push([r.staff_name ?? "Sin asignar", r.appointments, r.revenue]);
+
+  // Comisiones: el total por profesional para liquidar, y el desglose por
+  // servicio (con el % aplicado) para poder justificar cada línea.
+  if (b.commissions && b.commissions.by_staff.length > 0) {
+    rows.push([]);
+    rows.push(["Comisiones por profesional", "Citas", "Ingresos €", "% medio", "Comisión €"]);
+    for (const s of b.commissions.by_staff) {
+      rows.push([
+        s.staff_name ?? "Sin asignar",
+        s.appointments,
+        s.revenue,
+        s.effective_rate_pct !== null ? s.effective_rate_pct : "",
+        s.commission,
+      ]);
+    }
+    rows.push(["Total comisiones", "", b.commissions.total_revenue, "", b.commissions.total_commission]);
+
+    rows.push([]);
+    rows.push(["Detalle de comisiones", "Servicio", "Citas", "Ingresos €", "%", "Comisión €"]);
+    for (const d of b.commissions.detail) {
+      rows.push([d.staff_name ?? "Sin asignar", d.service_name, d.appointments, d.revenue, d.rate_pct, d.commission]);
+    }
+  }
 
   if (b.occupancy) {
     rows.push([]);

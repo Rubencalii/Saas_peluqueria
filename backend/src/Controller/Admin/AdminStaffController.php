@@ -275,6 +275,121 @@ final class AdminStaffController extends AdminController
     }
 
     /**
+     * Comisiones del profesional (migración 0028): tarifa general y, si las hay,
+     * excepciones por servicio.
+     */
+    #[Route('/api/v1/admin/staff/{id}/commissions', name: 'admin_staff_commissions_get', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function getCommissions(int $id, Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        try {
+            $this->auth->assertRole($user, self::CONFIG_ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+        if (!$this->staffExists($id, $user['account_id'])) {
+            return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
+        }
+        if (($denied = $this->assertManagesStaff($user, $id)) !== null) {
+            return $denied;
+        }
+
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT c.service_id, c.rate_pct, s.name AS service_name
+               FROM staff_commission c
+               LEFT JOIN service s ON s.id = c.service_id
+              WHERE c.staff_id = ? AND c.account_id = ?
+              ORDER BY s.name NULLS FIRST',
+            [$id, $user['account_id']]
+        );
+
+        $default = null;
+        $byService = [];
+        foreach ($rows as $r) {
+            if ($r['service_id'] === null) {
+                $default = (float) $r['rate_pct'];
+                continue;
+            }
+            $byService[] = [
+                'service_id' => (int) $r['service_id'],
+                'service_name' => (string) $r['service_name'],
+                'rate_pct' => (float) $r['rate_pct'],
+            ];
+        }
+
+        return $this->json(['staff_id' => $id, 'default_rate_pct' => $default, 'by_service' => $byService]);
+    }
+
+    /**
+     * Reemplaza las comisiones del profesional.
+     * Body: { default_rate_pct: number|null, by_service: [{service_id, rate_pct}, ...] }
+     */
+    #[Route('/api/v1/admin/staff/{id}/commissions', name: 'admin_staff_commissions_set', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function setCommissions(int $id, Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        try {
+            $this->auth->assertRole($user, self::CONFIG_ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+        if (!$this->staffExists($id, $user['account_id'])) {
+            return $this->error('NOT_FOUND', 'Profesional no encontrado.', 404);
+        }
+        if (($denied = $this->assertManagesStaff($user, $id)) !== null) {
+            return $denied;
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
+        }
+
+        $default = $payload['default_rate_pct'] ?? null;
+        if ($default !== null && !$this->isRate($default)) {
+            return $this->error('VALIDATION', 'El porcentaje general debe estar entre 0 y 100.', 400);
+        }
+
+        $entries = [];
+        foreach (is_array($payload['by_service'] ?? null) ? $payload['by_service'] : [] as $en) {
+            $serviceId = is_array($en) ? (int) ($en['service_id'] ?? 0) : 0;
+            $rate = is_array($en) ? ($en['rate_pct'] ?? null) : null;
+            if ($serviceId <= 0 || !$this->isRate($rate)) {
+                return $this->error('VALIDATION', 'Cada excepción necesita service_id y un porcentaje entre 0 y 100.', 400);
+            }
+            // Solo servicios de la propia cuenta (no se cruzan tenants).
+            if ($this->db->fetchOne('SELECT 1 FROM service WHERE id = ? AND account_id = ?', [$serviceId, $user['account_id']]) === false) {
+                return $this->error('NOT_FOUND', 'Servicio no encontrado.', 404);
+            }
+            $entries[$serviceId] = round((float) $rate, 2);
+        }
+
+        $accountId = $user['account_id'];
+        $this->db->transactional(function (Connection $tx) use ($id, $accountId, $default, $entries): void {
+            $tx->executeStatement('DELETE FROM staff_commission WHERE staff_id = ? AND account_id = ?', [$id, $accountId]);
+            if ($default !== null) {
+                $tx->executeStatement(
+                    'INSERT INTO staff_commission (account_id, staff_id, service_id, rate_pct) VALUES (?, ?, NULL, ?)',
+                    [$accountId, $id, round((float) $default, 2)]
+                );
+            }
+            foreach ($entries as $serviceId => $rate) {
+                $tx->executeStatement(
+                    'INSERT INTO staff_commission (account_id, staff_id, service_id, rate_pct) VALUES (?, ?, ?, ?)',
+                    [$accountId, $id, $serviceId, $rate]
+                );
+            }
+        });
+
+        return $this->json(['ok' => true]);
+    }
+
+    private function isRate(mixed $v): bool
+    {
+        return is_numeric($v) && (float) $v >= 0 && (float) $v <= 100;
+    }
+
+    /**
      * Devuelve la URL del feed iCal del profesional (doc 13 §2.6) para que se
      * suscriba en su calendario.
      */

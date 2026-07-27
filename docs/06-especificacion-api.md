@@ -100,6 +100,7 @@ PATCH  /api/v1/admin/customers/{id}
 GET/POST/PATCH  /api/v1/admin/services
 GET/POST/PATCH  /api/v1/admin/staff
 GET/POST/PATCH  /api/v1/admin/staff/{id}/schedule
+GET/POST        /api/v1/admin/staff/{id}/commissions
 GET/POST        /api/v1/admin/time-blocks
 GET/POST/PATCH  /api/v1/admin/locations        (solo admin_cadena)
 GET/PATCH       /api/v1/admin/locations/{id}/branding   (diseño propio)
@@ -112,6 +113,7 @@ POST   /api/v1/admin/conversations/{id}/reply
 GET    /api/v1/admin/reports/occupancy?location_id=&from=&to=
 GET    /api/v1/admin/reports/no-shows?location_id=&from=&to=
 GET    /api/v1/admin/reports/bookings-by-channel?...
+GET    /api/v1/admin/reports/commissions?location_id=&from=&to=
 ```
 
 ## 5. Autorización por rol (resumen)

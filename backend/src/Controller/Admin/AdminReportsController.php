@@ -216,6 +216,95 @@ final class AdminReportsController extends AdminController
     }
 
     /**
+     * Comisiones del personal (migración 0028): sobre las mismas citas
+     * completadas que el informe de ingresos, aplica el porcentaje configurado
+     * para cada profesional. La tarifa por servicio manda sobre la general del
+     * profesional; sin ninguna de las dos, la comisión es 0.
+     */
+    #[Route('/api/v1/admin/reports/commissions', name: 'admin_report_commissions', methods: ['GET'])]
+    public function commissions(Request $request): JsonResponse
+    {
+        $ctx = $this->context($request, requireLocation: false);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
+        [$locationId, $from, $to, , $accountId] = $ctx;
+        [$where, $params] = $this->scope($locationId, $accountId, $from, $to, 'a');
+        $where .= " AND a.status = 'completada'";
+
+        $price = 'COALESCE(sl.price_override, s.price)';
+        // Excepción por servicio > tarifa general del profesional > 0.
+        $rate = 'COALESCE(cs.rate_pct, cg.rate_pct, 0)';
+
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT a.staff_id, st.name AS staff_name, a.service_id, s.name AS service_name,
+                    COUNT(*) AS appts, COALESCE(SUM($price), 0) AS revenue, $rate AS rate_pct
+               FROM appointment a
+               JOIN service s ON s.id = a.service_id
+               LEFT JOIN service_location sl ON sl.service_id = a.service_id AND sl.location_id = a.location_id
+               LEFT JOIN staff st ON st.id = a.staff_id
+               LEFT JOIN staff_commission cs ON cs.staff_id = a.staff_id AND cs.service_id = a.service_id
+               LEFT JOIN staff_commission cg ON cg.staff_id = a.staff_id AND cg.service_id IS NULL
+              WHERE $where
+              GROUP BY a.staff_id, st.name, a.service_id, s.name, cs.rate_pct, cg.rate_pct
+              ORDER BY st.name NULLS LAST, s.name",
+            $params
+        );
+
+        $detail = [];
+        $staffTotals = [];
+        foreach ($rows as $r) {
+            $staffId = $r['staff_id'] !== null ? (int) $r['staff_id'] : null;
+            $revenue = round((float) $r['revenue'], 2);
+            $ratePct = (float) $r['rate_pct'];
+            $commission = round($revenue * $ratePct / 100, 2);
+
+            $detail[] = [
+                'staff_id' => $staffId,
+                'staff_name' => $r['staff_name'] !== null ? (string) $r['staff_name'] : null,
+                'service_id' => (int) $r['service_id'],
+                'service_name' => (string) $r['service_name'],
+                'appointments' => (int) $r['appts'],
+                'revenue' => $revenue,
+                'rate_pct' => $ratePct,
+                'commission' => $commission,
+            ];
+
+            $key = $staffId ?? 0;
+            $staffTotals[$key] ??= [
+                'staff_id' => $staffId,
+                'staff_name' => $r['staff_name'] !== null ? (string) $r['staff_name'] : null,
+                'appointments' => 0,
+                'revenue' => 0.0,
+                'commission' => 0.0,
+            ];
+            $staffTotals[$key]['appointments'] += (int) $r['appts'];
+            $staffTotals[$key]['revenue'] += $revenue;
+            $staffTotals[$key]['commission'] += $commission;
+        }
+
+        $byStaff = array_map(static function (array $s): array {
+            $s['revenue'] = round($s['revenue'], 2);
+            $s['commission'] = round($s['commission'], 2);
+            // Tipo medio real del periodo (mezcla de tarifas por servicio).
+            $s['effective_rate_pct'] = $s['revenue'] > 0 ? round($s['commission'] / $s['revenue'] * 100, 2) : null;
+
+            return $s;
+        }, array_values($staffTotals));
+        usort($byStaff, static fn (array $a, array $b): int => $b['commission'] <=> $a['commission']);
+
+        return $this->json([
+            'location_id' => $locationId,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->modify('-1 day')->format('Y-m-d'),
+            'total_revenue' => round(array_sum(array_column($byStaff, 'revenue')), 2),
+            'total_commission' => round(array_sum(array_column($byStaff, 'commission')), 2),
+            'by_staff' => $byStaff,
+            'detail' => $detail,
+        ]);
+    }
+
+    /**
      * Horas punta (doc 13 §2.8): nº de citas por día de la semana y por hora
      * local. Útil para dimensionar plantilla.
      */

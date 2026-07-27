@@ -64,15 +64,19 @@ test("mi cita: consultar, reprogramar y cancelar", async ({ page }) => {
   await expect(page.getByText(/no tienes próximas citas/)).toBeVisible({ timeout: 15_000 });
 });
 
-test("login del panel y agenda", async ({ page }) => {
+/** Entra al panel con el admin del seed y espera al dashboard. */
+async function loginPanel(page: Page): Promise<void> {
   await page.goto("/panel/login");
-
   await page.getByLabel("Email").fill("admin@salon.es");
   await page.getByLabel("Contraseña").fill("admin1234");
   await page.getByRole("button", { name: "Entrar" }).click();
+  await page.waitForURL("**/panel");
+}
+
+test("login del panel y agenda", async ({ page }) => {
+  await loginPanel(page);
 
   // Entra al panel (dashboard) con la navegación visible.
-  await page.waitForURL("**/panel");
   const agendaLink = page.locator("aside nav").getByRole("link", { name: /Agenda/ });
   await expect(agendaLink).toBeVisible({ timeout: 15_000 });
 
@@ -83,12 +87,7 @@ test("login del panel y agenda", async ({ page }) => {
 });
 
 test("alta manual de cita desde el panel", async ({ page }) => {
-  // Login.
-  await page.goto("/panel/login");
-  await page.getByLabel("Email").fill("admin@salon.es");
-  await page.getByLabel("Contraseña").fill("admin1234");
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await page.waitForURL("**/panel");
+  await loginPanel(page);
 
   // Ir a la agenda y abrir "Nueva cita".
   await page.locator("aside nav").getByRole("link", { name: /Agenda/ }).click();
@@ -106,11 +105,37 @@ test("alta manual de cita desde el panel", async ({ page }) => {
   await expect(slot).toBeVisible({ timeout: 15_000 });
   await slot.click();
 
-  // Cliente nuevo (modo por defecto) y crear.
-  await form.getByPlaceholder("Nombre del cliente").fill("Cliente Panel E2E");
-  await form.getByPlaceholder("Teléfono").fill("+34611" + String(Date.now()).slice(-6));
+  // Cliente nuevo (modo por defecto) y crear. El nombre lleva marca de tiempo:
+  // la BD de dev conserva los clientes de ejecuciones anteriores y un nombre
+  // fijo acabaría casando con varios en el listado.
+  const stamp = String(Date.now()).slice(-6);
+  const nombre = `Cliente Panel E2E ${stamp}`;
+  await form.getByPlaceholder("Nombre del cliente").fill(nombre);
+  await form.getByPlaceholder("Teléfono").fill("+34611" + stamp);
   await form.getByRole("button", { name: "Crear cita" }).click();
 
   // La cita aparece en el listado del día.
-  await expect(page.getByText("Cliente Panel E2E")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(nombre)).toBeVisible({ timeout: 15_000 });
+});
+
+test("comisiones del profesional: se guardan y persisten", async ({ page }) => {
+  await loginPanel(page);
+
+  await page.locator("aside nav").getByRole("link", { name: /Personal/ }).click();
+  await page.locator("ul button.card").first().click(); // abrir la ficha del primero
+
+  const card = page.locator(".card", { hasText: "Comisiones" });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+
+  const general = card.getByLabel(/Comisión general/);
+  await general.fill("35");
+  await card.getByRole("button", { name: "Guardar comisiones" }).click();
+  await expect(card.getByText("Comisiones guardadas.")).toBeVisible({ timeout: 15_000 });
+
+  // Al volver a abrir la ficha, la comisión sigue ahí.
+  await page.reload();
+  await page.locator("ul button.card").first().click();
+  await expect(page.locator(".card", { hasText: "Comisiones" }).getByLabel(/Comisión general/)).toHaveValue("35", {
+    timeout: 15_000,
+  });
 });

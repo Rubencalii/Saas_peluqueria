@@ -8,6 +8,7 @@ import {
   type AdminStaff,
   type StaffInput,
 } from "@/lib/admin";
+import { formatPrice } from "@/lib/format";
 
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
@@ -188,6 +189,142 @@ function StaffEditor({
       </div>
 
       {staff ? <ScheduleEditor staff={staff} locations={locations} /> : null}
+      {staff ? <CommissionsEditor staff={staff} services={services} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Comisiones del profesional: una tarifa general y, opcionalmente, un
+ * porcentaje distinto para servicios concretos. Vacío = sin comisión (0 %).
+ */
+function CommissionsEditor({ staff, services }: { staff: AdminStaff; services: AdminService[] }) {
+  const [defaultRate, setDefaultRate] = useState("");
+  const [rates, setRates] = useState<Record<number, string>>({});
+  // Los servicios que ofrece y, además, cualquiera con tarifa guardada: si se
+  // le quita un servicio, su excepción sigue visible en vez de borrarse sola.
+  const own = services.filter((s) => staff.service_ids.includes(s.id) || rates[s.id] !== undefined);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    admin
+      .staffCommissions(staff.id)
+      .then((c) => {
+        setDefaultRate(c.default_rate_pct === null ? "" : String(c.default_rate_pct));
+        setRates(Object.fromEntries(c.by_service.map((s) => [s.service_id, String(s.rate_pct)])));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [staff.id]);
+
+  /** "" → null (sin tarifa); número fuera de 0..100 → undefined (inválido). */
+  function parseRate(raw: string): number | null | undefined {
+    const v = raw.trim().replace(",", ".");
+    if (v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : undefined;
+  }
+
+  async function save() {
+    const general = parseRate(defaultRate);
+    if (general === undefined) {
+      setMsg({ ok: false, text: "La comisión general debe ser un porcentaje entre 0 y 100." });
+      return;
+    }
+    const byService: Array<{ service_id: number; rate_pct: number }> = [];
+    for (const s of own) {
+      const n = parseRate(rates[s.id] ?? "");
+      if (n === undefined) {
+        setMsg({ ok: false, text: `La comisión de "${s.name}" debe ser un porcentaje entre 0 y 100.` });
+        return;
+      }
+      if (n !== null) byService.push({ service_id: s.id, rate_pct: n });
+    }
+
+    setSaving(true);
+    setMsg(null);
+    try {
+      await admin.setStaffCommissions(staff.id, general, byService);
+      setMsg({ ok: true, text: "Comisiones guardadas." });
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "No se pudieron guardar las comisiones." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="card h-32 animate-pulse" />;
+
+  return (
+    <div className="card space-y-4 p-5">
+      <div>
+        <h2 className="text-lg font-semibold">Comisiones</h2>
+        <p className="mt-0.5 text-sm text-muted">
+          Porcentaje sobre las citas completadas. Lo ves liquidado en Informes → Comisiones.
+        </p>
+      </div>
+
+      <label className="block text-sm font-semibold">
+        Comisión general
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            value={defaultRate}
+            onChange={(e) => setDefaultRate(e.target.value)}
+            inputMode="decimal"
+            placeholder="sin comisión"
+            className="field w-32"
+          />
+          <span className="text-muted">%</span>
+        </div>
+      </label>
+
+      {own.length === 0 ? (
+        <p className="text-sm text-muted">
+          Asigna servicios a este profesional (arriba) para afinar la comisión servicio a servicio.
+        </p>
+      ) : (
+        <div className="text-sm font-semibold">
+          Excepciones por servicio
+          <p className="mb-2 mt-0.5 font-normal text-muted">En blanco se aplica la comisión general.</p>
+          <div className="space-y-2">
+            {own.map((s) => {
+              const rate = parseRate(rates[s.id] ?? "") ?? parseRate(defaultRate) ?? 0;
+              const perAppt = s.price !== null && rate > 0 ? (s.price * rate) / 100 : null;
+              return (
+                <div key={s.id} className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-40 flex-1 font-normal">{s.name}</span>
+                  <input
+                    value={rates[s.id] ?? ""}
+                    onChange={(e) => setRates({ ...rates, [s.id]: e.target.value })}
+                    inputMode="decimal"
+                    placeholder="general"
+                    aria-label={`Comisión de ${s.name}`}
+                    className="w-24 rounded-lg border border-border bg-card px-2 py-1.5 text-sm"
+                  />
+                  <span className="text-muted">%</span>
+                  <span className="w-28 text-right text-xs font-normal text-muted">
+                    {perAppt !== null ? `≈ ${formatPrice(perAppt)}/cita` : ""}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {msg ? (
+        <p className={"rounded-xl px-3 py-2 text-sm " + (msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>
+          {msg.text}
+        </p>
+      ) : null}
+
+      <div className="flex justify-end">
+        <button onClick={save} disabled={saving} className="btn-primary px-5 py-2.5">
+          {saving ? "Guardando…" : "Guardar comisiones"}
+        </button>
+      </div>
     </div>
   );
 }

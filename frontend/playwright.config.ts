@@ -14,7 +14,11 @@ const baseURL = `http://localhost:${webPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 60_000,
+  // En serie y con margen: el smoke corre contra `next dev`, que compila cada
+  // ruta la primera vez que se visita. En paralelo, varias pestañas pidiendo
+  // rutas sin compilar agotaban el timeout aunque la app estuviera bien.
+  workers: 1,
+  timeout: 90_000,
   use: {
     baseURL,
     locale: "es-ES",

@@ -75,8 +75,10 @@
 
 ## 6. Hecho también (2026-07-27, quinta tanda)
 
+- ✅ **Comisiones del personal** (migración `0028_comisiones.sql`): tarifa general por profesional y excepciones por servicio (la del servicio manda). No se materializa nada por cita: el informe `/admin/reports/commissions` calcula sobre las mismas citas **completadas** que el de ingresos, así que cambiar una tarifa se refleja al recalcular y no hay dos fuentes de verdad. UI: bloque *Comisiones* en la ficha del profesional (Personal) y sección + export CSV con detalle por servicio en Informes.
+- ✅ **Registro de migraciones regularizado**: `schema_migration` no tenía anotadas 0023–0027 (se aplicaron a mano en su día) y `--status` mentía. Anotadas como aplicadas; 0028 ya entró por el runner en dev y test.
 - ✅ **CI en verde otra vez**: el test del login del panel mockeaba `@/lib/admin` entero, así que `AdminApiError` quedaba `undefined` y el `catch` de la página reventaba desde que se añadió el 2FA. El mock conserva ahora el módulo real; añadida cobertura del segundo factor (`TOTP_REQUIRED` pide el código y lo reenvía, `TOTP_INVALID` avisa).
-- ✅ **E2E con puertos configurables** (`E2E_API_PORT` / `E2E_WEB_PORT`): antes fallaba en seco si algo ocupaba el 8000 o el 3000. El `next dev` de la prueba recibe el `API_BASE` del backend que arranca Playwright.
+- ✅ **E2E con puertos configurables** (`E2E_API_PORT` / `E2E_WEB_PORT`): antes fallaba en seco si algo ocupaba el 8000 o el 3000. El `next dev` de la prueba recibe el `API_BASE` del backend que arranca Playwright. Y en **serie** (`workers: 1`, timeout 90 s): en paralelo, varias pestañas pidiendo rutas que `next dev` aún no había compilado agotaban el timeout con la app sana.
 - ✅ **`composer stan` / `composer test`**: PHPStan necesita `--memory-limit=512M` (con el 128M por defecto de PHP el proceso paralelo se cae); CI ya lo pasaba pero el comando documentado para local no.
 - ✅ `.gitignore` ignora las salidas de Playwright (`test-results/`, `playwright-report/`).
 

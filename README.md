@@ -22,8 +22,9 @@ backend único con diseño **white-label** por cuenta.
   idempotente y **tarjetas regalo** con código canjeable en caja.
 - Lista de espera con aviso automático al liberarse hueco y conversión a cita,
   citas recurrentes, bandeja de WhatsApp (atención humana), valoraciones,
-  informes con comparativas y evolución de 12 meses (export CSV), usuarios del
-  equipo por rol, auditoría, **2FA (TOTP)**, apariencia white-label con paletas
+  informes con comparativas y evolución de 12 meses (export CSV), **comisiones
+  del personal** (tarifa general y por servicio, liquidación por periodo),
+  usuarios del equipo por rol, auditoría, **2FA (TOTP)**, apariencia white-label con paletas
   y prueba en vivo, y facturación de la suscripción (Stripe). Instalable como
   **PWA** en el móvil.
 
