@@ -5,28 +5,30 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { admin, clearToken, getToken, setToken, tokenExpiresAt, type PanelUser } from "@/lib/admin";
 import { brandName, brandVars, type Branding } from "@/lib/theme";
+import { canSee, type PanelArea } from "@/lib/roles";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-const NAV: Array<{ href: string; label: string; icon: string; roles?: string[] }> = [
-  { href: "/panel", label: "Inicio", icon: "🏡" },
-  { href: "/panel/agenda", label: "Agenda", icon: "📅" },
-  { href: "/panel/clientes", label: "Clientes", icon: "👥" },
-  { href: "/panel/servicios", label: "Servicios", icon: "✂️" },
-  { href: "/panel/bonos", label: "Bonos", icon: "🎟️", roles: ["admin_sede", "admin_cadena"] },
-  { href: "/panel/tarjetas", label: "Tarjetas regalo", icon: "🎁", roles: ["recepcion", "admin_sede", "admin_cadena"] },
-  { href: "/panel/personal", label: "Personal", icon: "🧑‍💼" },
-  { href: "/panel/bloqueos", label: "Bloqueos", icon: "🚫" },
-  { href: "/panel/sedes", label: "Sedes", icon: "🏠" },
-  { href: "/panel/whatsapp", label: "WhatsApp", icon: "💬" },
-  { href: "/panel/espera", label: "Lista de espera", icon: "⏳" },
-  { href: "/panel/recurrentes", label: "Recurrentes", icon: "🔁", roles: ["recepcion", "admin_sede", "admin_cadena"] },
-  { href: "/panel/valoraciones", label: "Valoraciones", icon: "⭐" },
-  { href: "/panel/informes", label: "Informes", icon: "📊" },
-  { href: "/panel/cuenta", label: "Cuenta", icon: "💳" },
-  { href: "/panel/apariencia", label: "Apariencia", icon: "🎨" },
-  { href: "/panel/seguridad", label: "Seguridad", icon: "🔒" },
-  { href: "/panel/usuarios", label: "Usuarios", icon: "🔐", roles: ["admin_cadena"] },
-  { href: "/panel/auditoria", label: "Auditoría", icon: "🧾", roles: ["admin_cadena"] },
+// Los permisos por área viven en lib/roles (espejo del assertRole del backend).
+const NAV: Array<{ href: string; label: string; icon: string; area: PanelArea }> = [
+  { href: "/panel", label: "Inicio", icon: "🏡", area: "inicio" },
+  { href: "/panel/agenda", label: "Agenda", icon: "📅", area: "agenda" },
+  { href: "/panel/clientes", label: "Clientes", icon: "👥", area: "clientes" },
+  { href: "/panel/servicios", label: "Servicios", icon: "✂️", area: "servicios" },
+  { href: "/panel/bonos", label: "Bonos", icon: "🎟️", area: "bonos" },
+  { href: "/panel/tarjetas", label: "Tarjetas regalo", icon: "🎁", area: "tarjetas" },
+  { href: "/panel/personal", label: "Personal", icon: "🧑‍💼", area: "personal" },
+  { href: "/panel/bloqueos", label: "Bloqueos", icon: "🚫", area: "bloqueos" },
+  { href: "/panel/sedes", label: "Sedes", icon: "🏠", area: "sedes" },
+  { href: "/panel/whatsapp", label: "WhatsApp", icon: "💬", area: "whatsapp" },
+  { href: "/panel/espera", label: "Lista de espera", icon: "⏳", area: "espera" },
+  { href: "/panel/recurrentes", label: "Recurrentes", icon: "🔁", area: "recurrentes" },
+  { href: "/panel/valoraciones", label: "Valoraciones", icon: "⭐", area: "valoraciones" },
+  { href: "/panel/informes", label: "Informes", icon: "📊", area: "informes" },
+  { href: "/panel/cuenta", label: "Cuenta", icon: "💳", area: "cuenta" },
+  { href: "/panel/apariencia", label: "Apariencia", icon: "🎨", area: "apariencia" },
+  { href: "/panel/seguridad", label: "Seguridad", icon: "🔒", area: "seguridad" },
+  { href: "/panel/usuarios", label: "Usuarios", icon: "🔐", area: "usuarios" },
+  { href: "/panel/auditoria", label: "Auditoría", icon: "🧾", area: "auditoria" },
 ];
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
@@ -134,7 +136,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           <span className="truncate font-semibold tracking-tight">{brandName(branding, "Panel")}</span>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:overflow-visible">
-          {NAV.filter((item) => !item.roles || (user !== null && item.roles.includes(user.role))).map((item) => {
+          {NAV.filter((item) => canSee(item.area, user?.role)).map((item) => {
             const active = item.href === "/panel" ? pathname === "/panel" : pathname.startsWith(item.href);
             return (
               <Link

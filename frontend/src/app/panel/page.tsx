@@ -5,6 +5,7 @@ import Link from "next/link";
 import { admin, type PanelUser, type ReportCommissions } from "@/lib/admin";
 import { formatPrice, formatTime } from "@/lib/format";
 import { aggregateOccupancy, upcomingAppointments, type DashItem } from "@/lib/dashboard";
+import { canSee, type PanelArea } from "@/lib/roles";
 
 function isoToday(): string {
   const n = new Date();
@@ -14,6 +15,17 @@ function isoFirstOfMonth(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-01`;
 }
+
+const ACCIONES: Array<{ href: string; icon: string; title: string; desc: string; area: PanelArea }> = [
+  { href: "/panel/agenda", icon: "📅", title: "Agenda", desc: "Ver el día y dar cita", area: "agenda" },
+  { href: "/panel/clientes", icon: "👥", title: "Clientes", desc: "Buscar y ver fichas", area: "clientes" },
+  { href: "/panel/servicios", icon: "✂️", title: "Servicios", desc: "Catálogo y precios", area: "servicios" },
+  { href: "/panel/personal", icon: "🧑‍💼", title: "Personal", desc: "Equipo y horarios", area: "personal" },
+  { href: "/panel/informes", icon: "📊", title: "Informes", desc: "Cómo va el negocio", area: "informes" },
+  { href: "/panel/apariencia", icon: "🎨", title: "Apariencia", desc: "Tu marca y logo", area: "apariencia" },
+  { href: "/panel/espera", icon: "⏳", title: "Lista de espera", desc: "Avisar al liberarse hueco", area: "espera" },
+  { href: "/panel/seguridad", icon: "🔒", title: "Seguridad", desc: "Contraseña y 2FA", area: "seguridad" },
+];
 
 export default function PanelHome() {
   const [user, setUser] = useState<PanelUser | null>(null);
@@ -26,27 +38,25 @@ export default function PanelHome() {
   const [myCommission, setMyCommission] = useState<ReportCommissions | null>(null);
 
   useEffect(() => {
+    // Se espera a saber el rol antes de pedir nada: cada bloque del panel de
+    // inicio necesita permisos distintos y pedirlo todo dejaba media pantalla
+    // con guiones (403) a quien no es administrador.
     admin
       .me()
       .then((r) => {
         setUser(r.user);
-        // Un profesional solo puede consultar su propia liquidación: el
-        // backend la acota a su ficha, así que aquí basta con pedirla.
-        if (r.user.role === "profesional") {
-          admin
-            .reportCommissions({ location_id: null, from: isoFirstOfMonth(), to: isoToday() })
-            .then(setMyCommission)
-            .catch(() => setMyCommission(null));
-        }
+        void load(r.user);
       })
-      .catch(() => {});
+      .catch(() => setToday(null));
 
-    // Agenda de hoy: une las de todas las sedes de la cuenta para el contador y
-    // la lista de próximas citas.
-    (async () => {
+    async function load(u: PanelUser) {
+      const day = isoToday();
+      const scope = { location_id: null, from: isoFirstOfMonth(), to: day };
+
+      // Agenda de hoy: une las de todas las sedes de la cuenta para el contador
+      // y la lista de próximas citas.
       try {
         const { locations } = await admin.locations();
-        const day = isoToday();
         const agendas = await Promise.all(
           locations.map((l) =>
             admin
@@ -59,27 +69,40 @@ export default function PanelHome() {
         setToday(all.length);
         setUpcoming(upcomingAppointments(all, Date.now()));
 
-        // Ocupación de hoy: minutos reservados / capacidad, sumando las sedes.
-        const occ = await Promise.all(
-          locations.map((l) =>
-            admin
-              .reportOccupancy({ location_id: l.id, from: day, to: day })
-              .then((r) => ({ booked_minutes: r.booked_minutes, capacity_minutes: r.capacity_minutes }))
-              .catch(() => ({ booked_minutes: 0, capacity_minutes: 0 })),
-          ),
-        );
-        setOccupancy(aggregateOccupancy(occ));
+        if (canSee("informes", u.role)) {
+          // Ocupación de hoy: minutos reservados / capacidad, sumando las sedes.
+          const occ = await Promise.all(
+            locations.map((l) =>
+              admin
+                .reportOccupancy({ location_id: l.id, from: day, to: day })
+                .then((r) => ({ booked_minutes: r.booked_minutes, capacity_minutes: r.capacity_minutes }))
+                .catch(() => ({ booked_minutes: 0, capacity_minutes: 0 })),
+            ),
+          );
+          setOccupancy(aggregateOccupancy(occ));
+        }
       } catch {
         setToday(null);
       }
-    })();
 
-    admin.conversations("pendiente", 1).then((r) => setPendingWa(r.total)).catch(() => setPendingWa(null));
-
-    const scope = { location_id: null, from: isoFirstOfMonth(), to: isoToday() };
-    admin.reportRevenue(scope).then((r) => setRevenue(r.total_revenue)).catch(() => setRevenue(null));
-    admin.reportRatings(scope).then((r) => setRating({ avg: r.average, count: r.count })).catch(() => setRating(null));
+      if (canSee("whatsapp", u.role)) {
+        admin.conversations("pendiente", 1).then((r) => setPendingWa(r.total)).catch(() => setPendingWa(null));
+      }
+      if (canSee("informes", u.role)) {
+        admin.reportRevenue(scope).then((r) => setRevenue(r.total_revenue)).catch(() => setRevenue(null));
+      }
+      if (canSee("valoraciones", u.role)) {
+        admin.reportRatings(scope).then((r) => setRating({ avg: r.average, count: r.count })).catch(() => setRating(null));
+      }
+      // Un profesional solo puede consultar su propia liquidación: el backend
+      // la acota a su ficha, así que aquí basta con pedirla.
+      if (u.role === "profesional") {
+        admin.reportCommissions(scope).then(setMyCommission).catch(() => setMyCommission(null));
+      }
+    }
   }, []);
+
+  const role = user?.role;
 
   return (
     <div className="space-y-6">
@@ -92,10 +115,18 @@ export default function PanelHome() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Kpi label="Citas hoy" value={today === null ? "—" : String(today)} href="/panel/agenda" />
-        <Kpi label="Ocupación hoy" value={occupancy === null ? "—" : `${Math.round(occupancy * 100)}%`} href="/panel/informes" />
-        <Kpi label="WhatsApp pendientes" value={pendingWa === null ? "—" : String(pendingWa)} href="/panel/whatsapp" highlight={(pendingWa ?? 0) > 0} />
-        <Kpi label="Ingresos del mes" value={revenue === null ? "—" : formatPrice(revenue)} href="/panel/informes" />
-        <Kpi label="Valoración media" value={rating && rating.count > 0 ? `${rating.avg.toFixed(2)} ★` : "—"} href="/panel/valoraciones" />
+        {canSee("informes", role) ? (
+          <Kpi label="Ocupación hoy" value={occupancy === null ? "—" : `${Math.round(occupancy * 100)}%`} href="/panel/informes" />
+        ) : null}
+        {canSee("whatsapp", role) ? (
+          <Kpi label="WhatsApp pendientes" value={pendingWa === null ? "—" : String(pendingWa)} href="/panel/whatsapp" highlight={(pendingWa ?? 0) > 0} />
+        ) : null}
+        {canSee("informes", role) ? (
+          <Kpi label="Ingresos del mes" value={revenue === null ? "—" : formatPrice(revenue)} href="/panel/informes" />
+        ) : null}
+        {canSee("valoraciones", role) ? (
+          <Kpi label="Valoración media" value={rating && rating.count > 0 ? `${rating.avg.toFixed(2)} ★` : "—"} href="/panel/valoraciones" />
+        ) : null}
       </div>
 
       {myCommission ? (
@@ -160,12 +191,9 @@ export default function PanelHome() {
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Accesos rápidos</h2>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Action href="/panel/agenda" icon="📅" title="Agenda" desc="Ver el día y dar cita" />
-          <Action href="/panel/clientes" icon="👥" title="Clientes" desc="Buscar y ver fichas" />
-          <Action href="/panel/servicios" icon="✂️" title="Servicios" desc="Catálogo y precios" />
-          <Action href="/panel/personal" icon="🧑‍💼" title="Personal" desc="Equipo y horarios" />
-          <Action href="/panel/informes" icon="📊" title="Informes" desc="Cómo va el negocio" />
-          <Action href="/panel/apariencia" icon="🎨" title="Apariencia" desc="Tu marca y logo" />
+          {ACCIONES.filter((a) => canSee(a.area, role)).map((a) => (
+            <Action key={a.href} href={a.href} icon={a.icon} title={a.title} desc={a.desc} />
+          ))}
         </div>
       </section>
     </div>
