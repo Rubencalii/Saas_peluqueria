@@ -63,13 +63,15 @@ jobs:
         working-directory: backend
         run: find src -name '*.php' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
 
+      # Mismos comandos que en local (documentados en docs/16): una sola fuente
+      # de verdad para las opciones (p. ej. el --memory-limit de PHPStan).
       - name: Análisis estático (PHPStan)
         working-directory: backend
-        run: php vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+        run: composer stan
 
       - name: Tests (PHPUnit)
         working-directory: backend
-        run: php bin/phpunit
+        run: composer test
 
   frontend:
     name: Frontend (Vitest + build)

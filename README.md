@@ -82,8 +82,8 @@ escriben al log en local. Secretos reales solo en `.env.local` (gitignorado).
 ```bash
 # Backend: PHPStan + suite completa contra peluqueria_test (rollback por test)
 cd backend
-vendor/bin/phpstan analyse --memory-limit=512M
-php bin/phpunit
+composer stan
+composer test
 
 # Frontend: lint + unit + build
 cd frontend
@@ -92,6 +92,9 @@ npm run lint && npm run test && npm run build
 # E2E (arranca backend y frontend solo; requiere la BD de Docker)
 cd frontend && npm run e2e
 ```
+
+Si el puerto 8000 o el 3000 están ocupados, el E2E usa los que le digas:
+`E2E_API_PORT=8010 E2E_WEB_PORT=3010 npm run e2e`.
 
 Si la BD de test no existe aún: créala y aplica `db/migrations/*.sql` + `db/seed.sql`
 (ver `.github/workflows/ci.yml`, que hace exactamente eso).

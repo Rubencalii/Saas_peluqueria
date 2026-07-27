@@ -68,7 +68,13 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
-        ]
+        ],
+        "stan": "phpstan analyse --no-progress --memory-limit=512M",
+        "test": "phpunit"
+    },
+    "scripts-descriptions": {
+        "stan": "Análisis estático con PHPStan (el límite de memoria por defecto de PHP se queda corto).",
+        "test": "Suite PHPUnit contra la base de datos de test."
     },
     "conflict": {
         "symfony/symfony": "*"

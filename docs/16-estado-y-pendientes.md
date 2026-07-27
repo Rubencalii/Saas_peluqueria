@@ -1,6 +1,6 @@
 # 16 · Estado del proyecto y pendientes
 
-> Última actualización: **2026-07-04** · Rama: `main` (todo lo listado como "hecho" está commiteado y en verde)
+> Última actualización: **2026-07-27** · Rama: `main` (todo lo listado como "hecho" está commiteado y en verde)
 > Objetivo del documento: retomar el trabajo rápido sabiendo **por dónde vamos y lo que queda**.
 
 ---
@@ -38,7 +38,7 @@
 
 ### Calidad
 - **CI (GitHub Actions)**: backend (php -l, PHPStan nivel 5 limpio, PHPUnit con Postgres real) + frontend (ESLint, Vitest, `next build`).
-- A fecha de este documento: **100 tests backend / 364 assertions** y **48 tests frontend** en verde. OpenAPI (`docs/openapi.yaml`) al día, incluido `/admin/users`.
+- A fecha de este documento: **124 tests backend / 584 assertions** y **69 tests frontend** en verde, más el smoke E2E. OpenAPI (`docs/openapi.yaml`) al día, incluido `/admin/users`.
 
 ---
 
@@ -65,7 +65,22 @@
 - ✅ **Web pública en 3 idiomas (es/ca/en)**: cookie `lang` + SSR traducido, selector en cabecera, fechas por `Intl`, Stripe Elements en el idioma del visitante; test de paridad de claves entre idiomas.
 - ✅ README raíz reescrito al estado real.
 
-## 5. Pendiente (todo requiere recursos externos)
+## 5. Hecho también (2026-07-08, cuarta tanda)
+
+- ✅ **Agenda**: notas internas por cita e impresión del listado del día (hoja limpia vía CSS de impresión).
+- ✅ **Felicitación de cumpleaños** por WhatsApp: fecha en la ficha del cliente y cron `app:birthday:greetings` (idempotente, respeta el consentimiento), añadido al scheduler de producción.
+- ✅ **Circuito de valoraciones completo**: petición tras completar la cita, página pública `/valorar` en los 3 idiomas y **reseña de Google** (URL por sede) para las notas altas.
+- ✅ **SEO técnico**: `robots.txt`, `sitemap.xml` por host (multi-tenant) y 404 propio en la raíz.
+- ✅ **Más cobertura**: E2E del alta manual desde el panel y del viaje completo de *Mi cita* (buscar → reprogramar → cancelar); `AdminCoverageTest` funcional sobre agenda, personal, bloqueos e informes.
+
+## 6. Hecho también (2026-07-27, quinta tanda)
+
+- ✅ **CI en verde otra vez**: el test del login del panel mockeaba `@/lib/admin` entero, así que `AdminApiError` quedaba `undefined` y el `catch` de la página reventaba desde que se añadió el 2FA. El mock conserva ahora el módulo real; añadida cobertura del segundo factor (`TOTP_REQUIRED` pide el código y lo reenvía, `TOTP_INVALID` avisa).
+- ✅ **E2E con puertos configurables** (`E2E_API_PORT` / `E2E_WEB_PORT`): antes fallaba en seco si algo ocupaba el 8000 o el 3000. El `next dev` de la prueba recibe el `API_BASE` del backend que arranca Playwright.
+- ✅ **`composer stan` / `composer test`**: PHPStan necesita `--memory-limit=512M` (con el 128M por defecto de PHP el proceso paralelo se cae); CI ya lo pasaba pero el comando documentado para local no.
+- ✅ `.gitignore` ignora las salidas de Playwright (`test-results/`, `playwright-report/`).
+
+## 7. Pendiente (todo requiere recursos externos)
 
 1. **MRR real vía Stripe**: los planes no tienen precio local (solo `stripe_price_id`); exige credenciales de Stripe. Mostrar en la consola cuando haya claves.
 2. **CD/staging**: CI testea (unit + E2E) pero no despliega; el runbook de `deploy/README.md` es manual. Requiere servidor y secretos.
@@ -73,24 +88,28 @@
 
 ---
 
-## 6. Cómo verificar (antes de cada commit)
+## 8. Cómo verificar (antes de cada commit)
 
 ```bash
 # BD de desarrollo/test (puerto 5446)
 docker compose up -d
 
 # Backend (desde backend/): PHPStan limpio + suite completa
-vendor/bin/phpstan analyse --no-progress
-php bin/phpunit
+composer stan
+composer test
 
 # Frontend (desde frontend/): lint + tests + build
 npm run lint && npx vitest run && npx next build
+
+# E2E (opcional, necesita la BD dev; puertos configurables si 8000/3000 están ocupados)
+npm run e2e
 ```
 
-- Las 2 deprecaciones de PHPUnit (`setNestTransactionsWithSavepoints` de Doctrine DBAL) son **preexistentes y conocidas**; la suite se considera verde con ellas.
+- `composer stan` fija `--memory-limit=512M`: con el límite por defecto de PHP (128M) el proceso paralelo de PHPStan se cae y el resultado sale incompleto.
+- Si el 8000 o el 3000 están ocupados: `E2E_API_PORT=8010 E2E_WEB_PORT=3010 npm run e2e` (en PowerShell, `$env:E2E_API_PORT="8010"`).
 - Si la BD no responde: el contenedor `peluqueria_db` se para a veces; `docker compose up -d` y esperar `pg_isready`.
 
-## 7. Convenciones del repo
+## 9. Convenciones del repo
 
 - Commits **sin marca de agua** ni Co-Authored-By; autor `Ruben <rubencorralromero2018@gmail.com>`; push directo a `main` tras verificar.
 - Secretos reales **solo** en `.env.local` (gitignorado); los `.env*` commiteados llevan placeholders.
