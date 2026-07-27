@@ -220,17 +220,36 @@ final class AdminReportsController extends AdminController
      * completadas que el informe de ingresos, aplica el porcentaje configurado
      * para cada profesional. La tarifa por servicio manda sobre la general del
      * profesional; sin ninguna de las dos, la comisión es 0.
+     *
+     * Único informe que el rol `profesional` puede consultar, y solo lo suyo:
+     * es su propia liquidación, no la del resto del equipo.
      */
     #[Route('/api/v1/admin/reports/commissions', name: 'admin_report_commissions', methods: ['GET'])]
     public function commissions(Request $request): JsonResponse
     {
-        $ctx = $this->context($request, requireLocation: false);
+        $user = self::user($request);
+        $isPro = $user['role'] === 'profesional';
+
+        $ctx = $this->context($request, requireLocation: false, roles: $isPro ? ['profesional'] : self::REPORT_ROLES);
         if ($ctx instanceof JsonResponse) {
             return $ctx;
         }
         [$locationId, $from, $to, , $accountId] = $ctx;
         [$where, $params] = $this->scope($locationId, $accountId, $from, $to, 'a');
         $where .= " AND a.status = 'completada'";
+
+        if ($isPro) {
+            // Vínculo por email con su ficha de profesional, igual que /auth/me.
+            $ownStaffId = $this->db->fetchOne(
+                'SELECT id FROM staff WHERE account_id = ? AND lower(email) = lower(?) AND active',
+                [$accountId, $user['email']]
+            );
+            if ($ownStaffId === false) {
+                return $this->error('FORBIDDEN', 'Tu usuario no está vinculado a una ficha de profesional.', 403);
+            }
+            $where .= ' AND a.staff_id = ?';
+            $params[] = (int) $ownStaffId;
+        }
 
         $price = 'COALESCE(sl.price_override, s.price)';
         // Excepción por servicio > tarifa general del profesional > 0.
@@ -504,14 +523,16 @@ final class AdminReportsController extends AdminController
     /**
      * Resuelve usuario, sede y rango [from, to) de fechas locales.
      *
+     * @param list<string> $roles roles admitidos (por defecto, los de informes)
+     *
      * @return array{0: int|null, 1: \DateTimeImmutable, 2: \DateTimeImmutable, 3: \DateTimeZone, 4: int}|JsonResponse
      */
-    private function context(Request $request, bool $requireLocation): array|JsonResponse
+    private function context(Request $request, bool $requireLocation, ?array $roles = null): array|JsonResponse
     {
         $user = self::user($request);
         $accountId = $user['account_id'];
         try {
-            $this->auth->assertRole($user, self::REPORT_ROLES);
+            $this->auth->assertRole($user, $roles ?? self::REPORT_ROLES);
             $requested = $request->query->get('location_id');
             $locationId = $this->auth->resolveLocation($user, $requested !== null && (int) $requested > 0 ? (int) $requested : null);
         } catch (AuthException $e) {

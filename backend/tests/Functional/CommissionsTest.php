@@ -144,6 +144,77 @@ final class CommissionsTest extends WebTestCase
         self::assertSame(0.0, (float) $report['total_commission']);
     }
 
+    public function testElProfesionalSoloVeSuPropiaLiquidacion(): void
+    {
+        $token = $this->login();
+        $monday = (new \DateTimeImmutable('next monday'))->format('Y-m-d');
+        $range = "from={$monday}&to={$monday}";
+
+        // Dos citas completadas con profesionales distintos. Se pide la
+        // disponibilidad de cada uno por separado: sin staff_id la API resuelve
+        // el "sin preferencia" y devuelve un solo profesional por hueco.
+        $staffIds = array_map('intval', $this->db->fetchFirstColumn(
+            'SELECT ss.staff_id FROM staff_service ss
+               JOIN staff_location sl ON sl.staff_id = ss.staff_id AND sl.location_id = 1
+              WHERE ss.service_id = 1 ORDER BY ss.staff_id LIMIT 2'
+        ));
+        self::assertCount(2, $staffIds, 'El seed debe ofrecer el servicio 1 con varios profesionales en la sede 1.');
+
+        foreach ($staffIds as $i => $staffId) {
+            $offer = $this->getJson(
+                "/api/v1/admin/availability?location_id=1&service_id=1&date={$monday}&staff_id={$staffId}",
+                $token
+            );
+            self::assertNotEmpty($offer['slots'], "El profesional $staffId debe tener hueco el lunes.");
+
+            $this->post('/api/v1/admin/appointments', $token, [
+                'location_id' => 1,
+                'service_id' => 1,
+                'staff_id' => $staffId,
+                'start' => $offer['slots'][0]['start'],
+                'customer' => ['name' => 'Liquidacion ' . $i, 'phone' => '+3460088200' . $i],
+            ]);
+            self::assertSame(201, $this->client->getResponse()->getStatusCode());
+            $apptId = (int) json_decode((string) $this->client->getResponse()->getContent(), true)['appointment_id'];
+            $this->client->request('PATCH', "/api/v1/admin/appointments/{$apptId}", server: $this->auth($token), content: (string) json_encode(['status' => 'completada']));
+            $this->post("/api/v1/admin/staff/{$staffId}/commissions", $token, ['default_rate_pct' => 20]);
+        }
+
+        // El admin ve a los dos.
+        $todos = $this->getJson("/api/v1/admin/reports/commissions?location_id=1&{$range}", $token);
+        self::assertGreaterThanOrEqual(2, count($todos['by_staff']));
+
+        // El usuario del primer profesional (vinculado por email) solo se ve a sí mismo.
+        $mio = $staffIds[0];
+        $email = (string) $this->db->fetchOne('SELECT email FROM staff WHERE id = ?', [$mio]);
+        self::assertNotSame('', $email, 'El profesional del seed necesita email para el vínculo.');
+        $this->db->executeStatement(
+            "INSERT INTO app_user (account_id, name, email, password_hash, role, location_id, active)
+             VALUES (1, 'Pro Liquidacion', ?, ?, 'profesional', 1, TRUE)",
+            [$email, password_hash('secreta123', PASSWORD_BCRYPT)]
+        );
+        $proToken = $this->login($email, 'secreta123');
+
+        $suyo = $this->getJson("/api/v1/admin/reports/commissions?location_id=1&{$range}", $proToken);
+        self::assertCount(1, $suyo['by_staff']);
+        self::assertSame($mio, (int) $suyo['by_staff'][0]['staff_id']);
+        self::assertGreaterThan(0, (float) $suyo['total_commission']);
+
+        // Sin ficha de profesional vinculada por email, no hay liquidación que dar.
+        $this->db->executeStatement(
+            "INSERT INTO app_user (account_id, name, email, password_hash, role, location_id, active)
+             VALUES (1, 'Pro Suelto', 'pro.suelto@salon.es', ?, 'profesional', 1, TRUE)",
+            [password_hash('secreta123', PASSWORD_BCRYPT)]
+        );
+        $sueltoToken = $this->login('pro.suelto@salon.es', 'secreta123');
+        $this->client->request('GET', "/api/v1/admin/reports/commissions?location_id=1&{$range}", server: $this->auth($sueltoToken));
+        self::assertSame(403, $this->client->getResponse()->getStatusCode());
+
+        // Y sigue sin poder tocar la configuración de nadie.
+        $this->post("/api/v1/admin/staff/{$mio}/commissions", $proToken, ['default_rate_pct' => 99]);
+        self::assertSame(403, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testSoloLosAdminsTocanLasComisiones(): void
     {
         $token = $this->login();

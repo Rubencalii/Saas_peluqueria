@@ -845,7 +845,7 @@ paths:
   /api/v1/admin/reports/revenue:
     get: { tags: [Panel], summary: "Ingresos por profesional/servicio", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
   /api/v1/admin/reports/commissions:
-    get: { tags: [Panel], summary: "Comisiones a liquidar por profesional (con detalle por servicio)", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
+    get: { tags: [Panel], summary: "Comisiones a liquidar por profesional (con detalle por servicio)", description: "Único informe accesible al rol profesional, acotado a su propia ficha (vínculo por email); 403 si su usuario no está vinculado.", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
   /api/v1/admin/reports/peak-hours:
     get: { tags: [Panel], summary: "Horas punta (día/hora)", security: [{ bearerAuth: [] }], responses: { "200": { description: Informe } } }
   /api/v1/admin/reports/retention:

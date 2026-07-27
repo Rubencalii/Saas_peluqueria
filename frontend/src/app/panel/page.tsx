@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { admin, type PanelUser } from "@/lib/admin";
+import { admin, type PanelUser, type ReportCommissions } from "@/lib/admin";
 import { formatPrice, formatTime } from "@/lib/format";
 import { aggregateOccupancy, upcomingAppointments, type DashItem } from "@/lib/dashboard";
 
@@ -23,9 +23,23 @@ export default function PanelHome() {
   const [pendingWa, setPendingWa] = useState<number | null>(null);
   const [revenue, setRevenue] = useState<number | null>(null);
   const [rating, setRating] = useState<{ avg: number; count: number } | null>(null);
+  const [myCommission, setMyCommission] = useState<ReportCommissions | null>(null);
 
   useEffect(() => {
-    admin.me().then((r) => setUser(r.user)).catch(() => {});
+    admin
+      .me()
+      .then((r) => {
+        setUser(r.user);
+        // Un profesional solo puede consultar su propia liquidación: el
+        // backend la acota a su ficha, así que aquí basta con pedirla.
+        if (r.user.role === "profesional") {
+          admin
+            .reportCommissions({ location_id: null, from: isoFirstOfMonth(), to: isoToday() })
+            .then(setMyCommission)
+            .catch(() => setMyCommission(null));
+        }
+      })
+      .catch(() => {});
 
     // Agenda de hoy: une las de todas las sedes de la cuenta para el contador y
     // la lista de próximas citas.
@@ -83,6 +97,34 @@ export default function PanelHome() {
         <Kpi label="Ingresos del mes" value={revenue === null ? "—" : formatPrice(revenue)} href="/panel/informes" />
         <Kpi label="Valoración media" value={rating && rating.count > 0 ? `${rating.avg.toFixed(2)} ★` : "—"} href="/panel/valoraciones" />
       </div>
+
+      {myCommission ? (
+        <section className="card p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Tus comisiones este mes</h2>
+          <p className="mt-2 text-3xl font-bold">{formatPrice(myCommission.total_commission)}</p>
+          <p className="mt-1 text-sm text-muted">
+            {myCommission.detail.reduce((n, d) => n + d.appointments, 0)} citas completadas ·{" "}
+            {formatPrice(myCommission.total_revenue)} facturados
+          </p>
+          {myCommission.detail.length > 0 ? (
+            <table className="mt-4 w-full text-sm">
+              <tbody>
+                {myCommission.detail.map((d) => (
+                  <tr key={d.service_id} className="border-b border-border/50 last:border-0">
+                    <td className="py-2 font-medium">{d.service_name}</td>
+                    <td className="py-2 text-muted">
+                      {d.appointments} citas · {d.rate_pct} %
+                    </td>
+                    <td className="py-2 text-right font-semibold">{formatPrice(d.commission)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="mt-3 text-sm text-muted">Aún no tienes citas completadas este mes.</p>
+          )}
+        </section>
+      ) : null}
 
       <section>
         <div className="mb-3 flex items-center justify-between">
