@@ -48,6 +48,11 @@ final class AdminGiftCardController extends AdminController
             return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
         }
 
+        $method = $payload['payment_method'] ?? null;
+        if ($method !== null && !in_array($method, AdminCashController::METHODS, true)) {
+            return $this->error('VALIDATION', 'Forma de pago inválida.', 400);
+        }
+
         try {
             $this->auth->assertRole($user, self::ROLES);
             $result = $this->cards->sell(
@@ -56,6 +61,8 @@ final class AdminGiftCardController extends AdminController
                 is_string($payload['recipient_name'] ?? null) ? $payload['recipient_name'] : null,
                 isset($payload['validity_days']) && (int) $payload['validity_days'] > 0 ? (int) $payload['validity_days'] : null,
                 $user['id'],
+                $method !== null ? (string) $method : null,
+                $user['location_id'],
             );
         } catch (AuthException|GiftCardException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);

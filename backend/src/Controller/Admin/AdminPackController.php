@@ -88,15 +88,24 @@ final class AdminPackController extends AdminController
     public function sell(int $id, Request $request): JsonResponse
     {
         $user = self::user($request);
-        $payload = json_decode($request->getContent(), true);
+        $decoded = json_decode($request->getContent(), true);
+        // Un cuerpo que no sea objeto se trata como vacío: pack_id 0 → NOT_FOUND.
+        $payload = is_array($decoded) ? $decoded : [];
+
+        $method = $payload['payment_method'] ?? null;
+        if ($method !== null && !in_array($method, AdminCashController::METHODS, true)) {
+            return $this->error('VALIDATION', 'Forma de pago inválida.', 400);
+        }
 
         try {
             $this->auth->assertRole($user, self::SELL_ROLES);
             $soldId = $this->packs->sell(
                 $id,
-                is_array($payload) ? (int) ($payload['pack_id'] ?? 0) : 0,
+                (int) ($payload['pack_id'] ?? 0),
                 $user['account_id'],
                 $user['id'],
+                $method !== null ? (string) $method : null,
+                $user['location_id'],
             );
         } catch (AuthException|PackException $e) {
             return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);

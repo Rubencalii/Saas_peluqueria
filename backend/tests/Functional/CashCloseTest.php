@@ -113,6 +113,60 @@ final class CashCloseTest extends WebTestCase
         self::assertSame('Admin', explode(' ', (string) $caja['close']['closed_by_name'])[0]);
     }
 
+    public function testLosPrepagosVendidosSumanAlCajonSegunSuFormaDePago(): void
+    {
+        // Recepción vende desde la sede 1, así que la venta es de ese cajón.
+        $this->db->executeStatement(
+            "INSERT INTO app_user (account_id, name, email, password_hash, role, location_id, active)
+             VALUES (1, 'Rec Prepago', 'rec.prepago@salon.es', ?, 'recepcion', 1, TRUE)",
+            [password_hash('secreta123', PASSWORD_BCRYPT)]
+        );
+        $token = $this->login('rec.prepago@salon.es', 'secreta123');
+        $hoy = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')))->format('Y-m-d');
+
+        $antes = (float) $this->getJson("/api/v1/admin/cash/day?location_id=1&date={$hoy}", $token)['expected_cash'];
+
+        // Tarjeta regalo de 50 € en efectivo: entra en el cajón.
+        $this->post('/api/v1/admin/gift-cards', $token, ['amount' => 50, 'payment_method' => 'efectivo']);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+
+        // Otra de 30 € con tarjeta: no entra en el cajón, pero sí en el listado.
+        $this->post('/api/v1/admin/gift-cards', $token, ['amount' => 30, 'payment_method' => 'tarjeta']);
+        self::assertSame(201, $this->client->getResponse()->getStatusCode());
+        $tarjetaId = (int) json_decode((string) $this->client->getResponse()->getContent(), true)['id'];
+
+        $caja = $this->getJson("/api/v1/admin/cash/day?location_id=1&date={$hoy}", $token);
+        self::assertSame(round($antes + 50, 2), round((float) $caja['expected_cash'], 2));
+        self::assertSame(80.0, round((float) $caja['prepaid_total'], 2));
+        self::assertSame(30.0, round((float) $caja['prepaid_by_method']['tarjeta']['amount'], 2));
+
+        // Corregir la forma de pago desde caja recalcula el cajón.
+        $this->client->request('PATCH', '/api/v1/admin/cash/prepaid', server: $this->auth($token), content: (string) json_encode([
+            'kind' => 'gift_card',
+            'id' => $tarjetaId,
+            'payment_method' => 'efectivo',
+        ]));
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        $caja = $this->getJson("/api/v1/admin/cash/day?location_id=1&date={$hoy}", $token);
+        self::assertSame(round($antes + 80, 2), round((float) $caja['expected_cash'], 2));
+
+        // Una venta de otra cuenta no puede tocarse aunque se acierte el id.
+        $otra = (int) $this->db->fetchOne(
+            "INSERT INTO account (name, slug, status) VALUES ('Otra Caja', 'otra-caja', 'active') RETURNING id"
+        );
+        $ajena = (int) $this->db->fetchOne(
+            "INSERT INTO gift_card (account_id, code, initial_amount, balance) VALUES (?, 'GIFT-ZZZZ-ZZZZ', 20, 20) RETURNING id",
+            [$otra]
+        );
+        $this->client->request('PATCH', '/api/v1/admin/cash/prepaid', server: $this->auth($token), content: (string) json_encode([
+            'kind' => 'gift_card',
+            'id' => $ajena,
+            'payment_method' => 'efectivo',
+        ]));
+        self::assertSame(404, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testElEsperadoNoSeFiaDelCliente(): void
     {
         $token = $this->login();

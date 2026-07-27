@@ -58,6 +58,16 @@ export default function CajaPage() {
     void load();
   }, [load]);
 
+  async function cobrarPrepago(kind: "gift_card" | "pack", id: number, method: PaymentMethod | null) {
+    try {
+      await admin.setPrepaidPayment(kind, id, method);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la forma de pago.");
+      await load();
+    }
+  }
+
   async function cobrar(appointmentId: number, method: PaymentMethod | null) {
     // Optimista: la fila cambia al instante y se recarga para recalcular totales.
     setData((d) =>
@@ -81,7 +91,7 @@ export default function CajaPage() {
 
   // Las horas se pintan en la zona de la sede (la caja es de una sede concreta).
   const zona = locations.find((l) => l.id === locationId)?.timezone ?? "Europe/Madrid";
-  const pendientes = data?.by_method.sin_registrar.count ?? 0;
+  const pendientes = (data?.by_method.sin_registrar.count ?? 0) + (data?.prepaid_by_method.sin_registrar.count ?? 0);
 
   return (
     <div className="space-y-5">
@@ -125,8 +135,8 @@ export default function CajaPage() {
           {pendientes > 0 ? (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {pendientes === 1
-                ? "Queda 1 cita sin forma de pago: elígela abajo para poder cuadrar."
-                : `Quedan ${pendientes} citas sin forma de pago: elígelas abajo para poder cuadrar.`}
+                ? "Queda 1 cobro sin forma de pago: elígela abajo para poder cuadrar."
+                : `Quedan ${pendientes} cobros sin forma de pago: elígelas abajo para poder cuadrar.`}
             </p>
           ) : null}
 
@@ -175,24 +185,36 @@ export default function CajaPage() {
 
           <Arqueo data={data} onClosed={load} locationId={locationId!} date={date} />
 
-          {data.gift_cards_sold.length > 0 || data.packs_sold.length > 0 ? (
+          {data.prepaid.length > 0 ? (
             <section className="card p-5">
-              <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted">Prepagos vendidos hoy</h2>
+              <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted">
+                Bonos y tarjetas regalo vendidos ({formatPrice(data.prepaid_total)})
+              </h2>
               <p className="mb-3 text-sm text-muted">
-                No suman al efectivo esperado: no se guarda con qué forma de pago se cobraron.
+                Se cobran al venderlos, así que lo pagado en efectivo también está en el cajón.
               </p>
               <table className="w-full text-sm">
                 <tbody>
-                  {data.gift_cards_sold.map((g) => (
-                    <tr key={g.code} className="border-b border-border/50 last:border-0">
-                      <td className="py-2 font-medium">Tarjeta regalo {g.code}</td>
-                      <td className="py-2 text-right font-semibold tabular-nums">{formatPrice(g.amount)}</td>
-                    </tr>
-                  ))}
-                  {data.packs_sold.map((p, i) => (
-                    <tr key={`${p.name}-${i}`} className="border-b border-border/50 last:border-0">
-                      <td className="py-2 font-medium">Bono · {p.name}</td>
-                      <td className="py-2 text-right font-semibold tabular-nums">{formatPrice(p.amount)}</td>
+                  {data.prepaid.map((p) => (
+                    <tr key={`${p.kind}-${p.id}`} className="border-b border-border/50 last:border-0">
+                      <td className="py-2 pr-3 font-medium">{p.label}</td>
+                      <td className="py-2 pr-3 text-right font-semibold tabular-nums">{formatPrice(p.amount)}</td>
+                      <td className="py-2">
+                        <select
+                          value={p.payment_method ?? ""}
+                          onChange={(e) => cobrarPrepago(p.kind, p.id, (e.target.value || null) as PaymentMethod | null)}
+                          aria-label={`Forma de pago de ${p.label}`}
+                          className={
+                            "rounded-lg border bg-card px-2 py-1.5 text-sm " +
+                            (p.payment_method === null ? "border-amber-400" : "border-border")
+                          }
+                        >
+                          <option value="">Sin registrar</option>
+                          {METODOS.filter((m) => m.value !== "bono" && m.value !== "regalo").map((m) => (
+                            <option key={m.value} value={m.value}>{m.label}</option>
+                          ))}
+                        </select>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -256,8 +278,8 @@ function Arqueo({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Arqueo</h2>
         <p className="mt-2 text-sm text-muted">
           En el cajón debería haber{" "}
-          <span className="font-semibold text-foreground">{formatPrice(data.expected_cash)}</span> (solo lo cobrado en
-          efectivo).
+          <span className="font-semibold text-foreground">{formatPrice(data.expected_cash)}</span>: lo cobrado en
+          efectivo, servicios y prepagos vendidos hoy.
         </p>
       </div>
 

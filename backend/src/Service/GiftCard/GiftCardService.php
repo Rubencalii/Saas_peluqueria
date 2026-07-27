@@ -27,7 +27,7 @@ final class GiftCardService
      *
      * @throws GiftCardException
      */
-    public function sell(int $accountId, float $amount, ?string $recipient, ?int $validityDays, ?int $soldBy): array
+    public function sell(int $accountId, float $amount, ?string $recipient, ?int $validityDays, ?int $soldBy, ?string $paymentMethod = null, ?int $soldLocationId = null): array
     {
         if ($amount <= 0 || $amount > 10000) {
             throw new GiftCardException('VALIDATION', 'El importe debe estar entre 0,01 y 10.000 €.');
@@ -45,9 +45,9 @@ final class GiftCardService
             $code = $this->generateCode();
             try {
                 $id = (int) $this->db->fetchOne(
-                    'INSERT INTO gift_card (account_id, code, initial_amount, balance, recipient_name, expires_at, sold_by)
-                     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
-                    [$accountId, $code, $amount, $amount, $recipient !== null && trim($recipient) !== '' ? trim($recipient) : null, $expires, $soldBy]
+                    'INSERT INTO gift_card (account_id, code, initial_amount, balance, recipient_name, expires_at, sold_by, payment_method, sold_location_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
+                    [$accountId, $code, $amount, $amount, $recipient !== null && trim($recipient) !== '' ? trim($recipient) : null, $expires, $soldBy, $paymentMethod, $soldLocationId]
                 );
 
                 return ['id' => $id, 'code' => $code];

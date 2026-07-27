@@ -305,12 +305,24 @@ export interface CashClose {
   closed_by_name: string | null;
 }
 
+export interface PrepaidSale {
+  kind: "gift_card" | "pack";
+  id: number;
+  label: string;
+  amount: number;
+  payment_method: PaymentMethod | null;
+}
+
 export interface CashDay {
   location_id: number;
   date: string;
   total: number;
+  /** Bonos y tarjetas regalo vendidos ese día en esa sede. */
+  prepaid_total: number;
   expected_cash: number;
   by_method: Record<PaymentMethod | "sin_registrar", { count: number; amount: number }>;
+  prepaid_by_method: Record<PaymentMethod | "sin_registrar", { count: number; amount: number }>;
+  prepaid: PrepaidSale[];
   appointments: Array<{
     appointment_id: number;
     start: string;
@@ -320,8 +332,6 @@ export interface CashDay {
     amount: number;
     payment_method: PaymentMethod | null;
   }>;
-  gift_cards_sold: Array<{ code: string; amount: number }>;
-  packs_sold: Array<{ name: string; amount: number }>;
   close: CashClose | null;
 }
 
@@ -628,6 +638,11 @@ export const admin = {
 
   cashDay: (locationId: number, date: string) =>
     adminFetch<CashDay>(`/api/v1/admin/cash/day?location_id=${locationId}&date=${date}`),
+  setPrepaidPayment: (kind: "gift_card" | "pack", id: number, method: PaymentMethod | null) =>
+    adminFetch<{ ok: boolean }>("/api/v1/admin/cash/prepaid", {
+      method: "PATCH",
+      body: { kind, id, payment_method: method },
+    }),
   closeCash: (locationId: number, date: string, countedCash: number, notes: string | null) =>
     adminFetch<{ close: CashClose }>("/api/v1/admin/cash/close", {
       method: "POST",
@@ -732,8 +747,12 @@ export const admin = {
   audit: (page: number) => adminFetch<AuditList>(`/api/v1/admin/audit?page=${page}&per_page=25`),
 
   giftCards: () => adminFetch<{ gift_cards: GiftCard[] }>("/api/v1/admin/gift-cards"),
-  sellGiftCard: (body: { amount: number; recipient_name?: string | null; validity_days?: number | null }) =>
-    adminFetch<{ id: number; code: string }>("/api/v1/admin/gift-cards", { method: "POST", body }),
+  sellGiftCard: (body: {
+    amount: number;
+    recipient_name?: string | null;
+    validity_days?: number | null;
+    payment_method?: PaymentMethod | null;
+  }) => adminFetch<{ id: number; code: string }>("/api/v1/admin/gift-cards", { method: "POST", body }),
   giftCard: (code: string) =>
     adminFetch<{ gift_card: GiftCardDetail }>(`/api/v1/admin/gift-cards/${encodeURIComponent(code)}`),
   redeemGiftCard: (code: string, amount: number) =>
@@ -748,10 +767,10 @@ export const admin = {
   setPackActive: (id: number, active: boolean) =>
     adminFetch<{ ok: boolean }>(`/api/v1/admin/packs/${id}`, { method: "PATCH", body: { active } }),
   customerPacks: (id: number) => adminFetch<{ packs: CustomerPack[] }>(`/api/v1/admin/customers/${id}/packs`),
-  sellPack: (customerId: number, packId: number) =>
+  sellPack: (customerId: number, packId: number, method: PaymentMethod | null = null) =>
     adminFetch<{ id: number }>(`/api/v1/admin/customers/${customerId}/packs`, {
       method: "POST",
-      body: { pack_id: packId },
+      body: { pack_id: packId, payment_method: method },
     }),
 
   users: () => adminFetch<{ users: PanelTeamUser[] }>("/api/v1/admin/users"),

@@ -95,7 +95,7 @@ final class PackService
      *
      * @throws PackException
      */
-    public function sell(int $customerId, int $packId, int $accountId, ?int $soldBy): int
+    public function sell(int $customerId, int $packId, int $accountId, ?int $soldBy, ?string $paymentMethod = null, ?int $soldLocationId = null): int
     {
         $pack = $this->db->fetchAssociative(
             'SELECT sessions, validity_days FROM pack WHERE id = ? AND account_id = ? AND active',
@@ -113,9 +113,9 @@ final class PackService
             : null;
 
         return (int) $this->db->fetchOne(
-            'INSERT INTO customer_pack (customer_id, pack_id, sessions_left, expires_at, sold_by)
-             VALUES (?, ?, ?, ?, ?) RETURNING id',
-            [$customerId, $packId, (int) $pack['sessions'], $expires, $soldBy]
+            'INSERT INTO customer_pack (customer_id, pack_id, sessions_left, expires_at, sold_by, payment_method, sold_location_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
+            [$customerId, $packId, (int) $pack['sessions'], $expires, $soldBy, $paymentMethod, $soldLocationId]
         );
     }
 

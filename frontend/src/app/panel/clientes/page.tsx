@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { admin, type CustomerDetail, type CustomerList, type CustomerPack, type Pack } from "@/lib/admin";
+import {
+  admin,
+  type CustomerDetail,
+  type CustomerList,
+  type CustomerPack,
+  type Pack,
+  type PaymentMethod,
+} from "@/lib/admin";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDateLong, formatTime } from "@/lib/format";
 import { nextAppointment } from "@/lib/dashboard";
@@ -216,6 +223,8 @@ function CustomerCard({
   const [packs, setPacks] = useState<Array<CustomerPack & { expired: boolean }>>([]);
   const [catalog, setCatalog] = useState<Pack[]>([]);
   const [sellId, setSellId] = useState<number | "">("");
+  // Forma de pago del bono: la caja la necesita para cuadrar el cajón.
+  const [sellMethod, setSellMethod] = useState<PaymentMethod>("efectivo");
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
@@ -274,7 +283,7 @@ function CustomerCard({
     setBusy(true);
     setMsg(null);
     try {
-      await admin.sellPack(id, Number(sellId));
+      await admin.sellPack(id, Number(sellId), sellMethod);
       setSellId("");
       reload();
       setMsg({ ok: true, text: "Bono vendido." });
@@ -429,6 +438,16 @@ function CustomerCard({
                     {p.name} · {p.sessions} sesiones
                   </option>
                 ))}
+              </select>
+              <select
+                value={sellMethod}
+                onChange={(e) => setSellMethod(e.target.value as PaymentMethod)}
+                aria-label="Forma de pago del bono"
+                className="field mt-0 w-28 text-sm"
+              >
+                <option value="efectivo">Efectivo</option>
+                <option value="tarjeta">Tarjeta</option>
+                <option value="online">Online</option>
               </select>
               <button onClick={sell} disabled={busy || sellId === ""} className="btn-ghost px-3 py-1.5 text-xs">
                 Vender

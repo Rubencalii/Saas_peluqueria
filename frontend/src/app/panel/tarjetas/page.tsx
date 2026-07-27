@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { admin, type GiftCard, type GiftCardDetail } from "@/lib/admin";
+import { admin, type GiftCard, type GiftCardDetail, type PaymentMethod } from "@/lib/admin";
 import { formatPrice } from "@/lib/format";
 
 export default function TarjetasPage() {
@@ -77,6 +77,7 @@ function SellCard({ onSold }: { onSold: () => void }) {
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [validity, setValidity] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("efectivo");
   const [saving, setSaving] = useState(false);
   const [soldCode, setSoldCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +94,7 @@ function SellCard({ onSold }: { onSold: () => void }) {
         amount: Number(amount),
         recipient_name: recipient.trim() || null,
         validity_days: validity.trim() !== "" ? Number(validity) : null,
+        payment_method: method,
       });
       setSoldCode(r.code);
       setAmount("");
@@ -132,6 +134,15 @@ function SellCard({ onSold }: { onSold: () => void }) {
             <label className="block text-sm font-semibold">
               Validez (días)
               <input type="number" min={1} value={validity} onChange={(e) => setValidity(e.target.value)} placeholder="Sin caducidad" className="field" />
+            </label>
+            <label className="block text-sm font-semibold">
+              Cobrada con
+              <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} className="field">
+                <option value="efectivo">Efectivo</option>
+                <option value="tarjeta">Tarjeta</option>
+                <option value="online">Pagado online</option>
+              </select>
+              <span className="mt-1 block text-xs font-normal text-muted">Para que cuadre el cierre de caja.</span>
             </label>
           </div>
 

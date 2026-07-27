@@ -12,12 +12,13 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Caja del día (migración 0029): qué se ha cobrado en una sede y cómo, y
- * arqueo al cerrar. Es trabajo de mostrador, así que también lo usa recepción.
+ * Caja del día (migraciones 0029 y 0030): qué se ha cobrado en una sede y
+ * cómo, y arqueo al cerrar. Es trabajo de mostrador, así que también lo usa
+ * recepción.
  *
- * El efectivo esperado sale SOLO de las citas cobradas en efectivo: los bonos
- * y las tarjetas regalo se cobraron el día que se vendieron y no se guarda con
- * qué forma de pago, así que se listan aparte como información, sin sumarlos.
+ * En el cajón hay dos cosas: los servicios cobrados en efectivo y los
+ * prepagos (bonos y tarjetas regalo) vendidos en efectivo. Una cita pagada
+ * con 'bono' o 'regalo' NO suma dinero: se cobró el día de la venta.
  */
 final class AdminCashController extends AdminController
 {
@@ -78,37 +79,111 @@ final class AdminCashController extends AdminController
             ];
         }
 
-        // Prepagos vendidos hoy (informativos: entraron por caja, pero no se
-        // guarda con qué forma de pago se cobraron).
-        $giftCards = $this->db->fetchAllAssociative(
-            'SELECT code, initial_amount FROM gift_card
-              WHERE account_id = ? AND created_at >= ? AND created_at < ? ORDER BY created_at',
-            [$this->accountId($request), $fromUtc, $toUtc]
-        );
-        $packs = $this->db->fetchAllAssociative(
-            'SELECT p.name, p.price FROM customer_pack cp
-               JOIN pack p ON p.id = cp.pack_id
-              WHERE p.account_id = ? AND cp.sold_at >= ? AND cp.sold_at < ? ORDER BY cp.sold_at',
-            [$this->accountId($request), $fromUtc, $toUtc]
-        );
+        // Prepagos vendidos hoy en esta sede: dinero que entró con la venta.
+        $prepaid = $this->prepaidOfDay($locationId, $fromUtc, $toUtc);
+        $prepaidByMethod = array_fill_keys([...self::METHODS, 'sin_registrar'], ['count' => 0, 'amount' => 0.0]);
+        $prepaidTotal = 0.0;
+        foreach ($prepaid as $p) {
+            $key = $p['payment_method'] ?? 'sin_registrar';
+            ++$prepaidByMethod[$key]['count'];
+            $prepaidByMethod[$key]['amount'] = round($prepaidByMethod[$key]['amount'] + $p['amount'], 2);
+            $prepaidTotal = round($prepaidTotal + $p['amount'], 2);
+        }
 
         return $this->json([
             'location_id' => $locationId,
             'date' => $date,
             'total' => $total,
-            'expected_cash' => $byMethod['efectivo']['amount'],
+            'prepaid_total' => $prepaidTotal,
+            // Se calcula con el mismo helper que usa el cierre: la pantalla y el
+            // arqueo no pueden discrepar.
+            'expected_cash' => $this->expectedCash($locationId, $fromUtc, $toUtc),
             'by_method' => $byMethod,
+            'prepaid_by_method' => $prepaidByMethod,
             'appointments' => $rows,
-            'gift_cards_sold' => array_map(static fn (array $g): array => [
-                'code' => (string) $g['code'],
-                'amount' => round((float) $g['initial_amount'], 2),
-            ], $giftCards),
-            'packs_sold' => array_map(static fn (array $p): array => [
-                'name' => (string) $p['name'],
-                'amount' => round((float) $p['price'], 2),
-            ], $packs),
+            'prepaid' => $prepaid,
             'close' => $this->closeOf($locationId, $date),
         ]);
+    }
+
+    /**
+     * Cambia la forma de pago de un prepago ya vendido (para corregir desde la
+     * pantalla de caja). Body: { kind: 'gift_card'|'pack', id, payment_method }
+     */
+    #[Route('/api/v1/admin/cash/prepaid', name: 'admin_cash_prepaid_method', methods: ['PATCH'])]
+    public function prepaidMethod(Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        try {
+            $this->auth->assertRole($user, self::ROLES);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload)) {
+            return $this->error('VALIDATION', 'El cuerpo debe ser un objeto JSON.', 400);
+        }
+        $kind = $payload['kind'] ?? '';
+        $id = (int) ($payload['id'] ?? 0);
+        $method = $payload['payment_method'] ?? null;
+        if (!in_array($kind, ['gift_card', 'pack'], true) || $id <= 0) {
+            return $this->error('VALIDATION', 'Indica kind (gift_card o pack) e id.', 400);
+        }
+        if ($method !== null && !in_array($method, self::METHODS, true)) {
+            return $this->error('VALIDATION', 'Forma de pago inválida.', 400);
+        }
+
+        // El WHERE ata la fila a la cuenta: no se toca lo de otro tenant.
+        $affected = 'gift_card' === $kind
+            ? $this->db->executeStatement(
+                'UPDATE gift_card SET payment_method = ? WHERE id = ? AND account_id = ?',
+                [$method, $id, $user['account_id']]
+            )
+            : $this->db->executeStatement(
+                'UPDATE customer_pack cp SET payment_method = ?
+                   FROM pack p WHERE p.id = cp.pack_id AND cp.id = ? AND p.account_id = ?',
+                [$method, $id, $user['account_id']]
+            );
+
+        if ($affected === 0) {
+            return $this->error('NOT_FOUND', 'Venta no encontrada.', 404);
+        }
+
+        return $this->json(['ok' => true]);
+    }
+
+    /**
+     * Bonos y tarjetas regalo vendidos en esa sede y ventana. Los vendidos sin
+     * sede (admin_cadena sin sede fija) no son de ningún cajón, así que no
+     * aparecen en ningún arqueo.
+     *
+     * @return list<array{kind: string, id: int, label: string, amount: float, payment_method: string|null}>
+     */
+    private function prepaidOfDay(int $locationId, string $fromUtc, string $toUtc): array
+    {
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT 'gift_card' AS kind, id, 'Tarjeta regalo ' || code AS label,
+                    initial_amount AS amount, payment_method, created_at AS sold_at
+               FROM gift_card
+              WHERE sold_location_id = ? AND created_at >= ? AND created_at < ?
+              UNION ALL
+             SELECT 'pack' AS kind, cp.id, 'Bono · ' || p.name AS label,
+                    p.price AS amount, cp.payment_method, cp.sold_at
+               FROM customer_pack cp
+               JOIN pack p ON p.id = cp.pack_id
+              WHERE cp.sold_location_id = ? AND cp.sold_at >= ? AND cp.sold_at < ?
+              ORDER BY sold_at",
+            [$locationId, $fromUtc, $toUtc, $locationId, $fromUtc, $toUtc]
+        );
+
+        return array_map(static fn (array $r): array => [
+            'kind' => (string) $r['kind'],
+            'id' => (int) $r['id'],
+            'label' => (string) $r['label'],
+            'amount' => round((float) $r['amount'], 2),
+            'payment_method' => $r['payment_method'] !== null ? (string) $r['payment_method'] : null,
+        ], $rows);
     }
 
     /**
@@ -135,15 +210,7 @@ final class AdminCashController extends AdminController
         }
 
         [$fromUtc, $toUtc] = $this->dayBounds($date, $tz);
-        $expected = (float) $this->db->fetchOne(
-            "SELECT COALESCE(SUM(COALESCE(sl.price_override, s.price, 0)), 0)
-               FROM appointment a
-               JOIN service s ON s.id = a.service_id
-               LEFT JOIN service_location sl ON sl.service_id = a.service_id AND sl.location_id = a.location_id
-              WHERE a.location_id = ? AND a.start_at >= ? AND a.start_at < ?
-                AND a.status = 'completada' AND a.payment_method = 'efectivo'",
-            [$locationId, $fromUtc, $toUtc]
-        );
+        $expected = $this->expectedCash($locationId, $fromUtc, $toUtc);
 
         $user = self::user($request);
         $this->db->executeStatement(
@@ -164,6 +231,32 @@ final class AdminCashController extends AdminController
         );
 
         return $this->json(['close' => $this->closeOf($locationId, $date)]);
+    }
+
+    /**
+     * Lo que debería haber en el cajón: servicios cobrados en efectivo más
+     * prepagos vendidos en efectivo en esa sede.
+     */
+    private function expectedCash(int $locationId, string $fromUtc, string $toUtc): float
+    {
+        $servicios = (float) $this->db->fetchOne(
+            "SELECT COALESCE(SUM(COALESCE(sl.price_override, s.price, 0)), 0)
+               FROM appointment a
+               JOIN service s ON s.id = a.service_id
+               LEFT JOIN service_location sl ON sl.service_id = a.service_id AND sl.location_id = a.location_id
+              WHERE a.location_id = ? AND a.start_at >= ? AND a.start_at < ?
+                AND a.status = 'completada' AND a.payment_method = 'efectivo'",
+            [$locationId, $fromUtc, $toUtc]
+        );
+
+        $prepagos = 0.0;
+        foreach ($this->prepaidOfDay($locationId, $fromUtc, $toUtc) as $p) {
+            if ('efectivo' === $p['payment_method']) {
+                $prepagos += $p['amount'];
+            }
+        }
+
+        return round($servicios + $prepagos, 2);
     }
 
     /**
@@ -247,10 +340,5 @@ final class AdminCashController extends AdminController
             $from->setTimezone($utc)->format('c'),
             $from->modify('+1 day')->setTimezone($utc)->format('c'),
         ];
-    }
-
-    private function accountId(Request $request): int
-    {
-        return self::user($request)['account_id'];
     }
 }
