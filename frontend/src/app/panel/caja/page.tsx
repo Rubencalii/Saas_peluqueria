@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   admin,
   type AdminLocation,
+  type CashCloseHistory,
   type CashDay,
   type PaymentMethod,
 } from "@/lib/admin";
@@ -185,6 +186,8 @@ export default function CajaPage() {
 
           <Arqueo data={data} onClosed={load} locationId={locationId!} date={date} />
 
+          <Historico locationId={locationId!} recargar={data.close?.closed_at ?? null} />
+
           {data.prepaid.length > 0 ? (
             <section className="card p-5">
               <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted">
@@ -332,6 +335,69 @@ function Arqueo({
       ) : null}
 
       {msg ? <p className="text-sm text-muted">{msg}</p> : null}
+    </section>
+  );
+}
+
+/**
+ * Últimos 30 cierres de la sede. Un descuadre suelto es un despiste; verlos
+ * seguidos es lo que dice si hay un problema.
+ */
+function Historico({ locationId, recargar }: { locationId: number; recargar: string | null }) {
+  const [hist, setHist] = useState<CashCloseHistory | null>(null);
+  const [abierto, setAbierto] = useState(false);
+
+  useEffect(() => {
+    admin.cashCloses(locationId).then(setHist).catch(() => setHist(null));
+  }, [locationId, recargar]);
+
+  if (!hist || hist.closes.length === 0) return null;
+
+  return (
+    <section className="card p-5">
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+        aria-expanded={abierto}
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Cierres anteriores ({hist.closes.length})
+        </h2>
+        <span className="text-sm text-muted">
+          {hist.days_with_difference === 0
+            ? "todos cuadrados"
+            : `${hist.days_with_difference} con descuadre · ${formatPrice(hist.total_difference)} acumulado`}{" "}
+          {abierto ? "▲" : "▼"}
+        </span>
+      </button>
+
+      {abierto ? (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm">
+            <tbody>
+              {hist.closes.map((c) => (
+                <tr key={c.date} className="border-b border-border/50 last:border-0">
+                  <td className="py-2 pr-3 font-medium tabular-nums">{c.date}</td>
+                  <td className="py-2 pr-3 text-muted tabular-nums">
+                    {formatPrice(c.counted_cash)} de {formatPrice(c.expected_cash)}
+                  </td>
+                  <td
+                    className={
+                      "py-2 pr-3 text-right font-semibold tabular-nums " +
+                      (c.difference === 0 ? "text-emerald-700" : c.difference > 0 ? "text-amber-700" : "text-red-700")
+                    }
+                  >
+                    {c.difference === 0 ? "cuadra" : formatPrice(c.difference)}
+                  </td>
+                  <td className="py-2 text-xs text-muted">
+                    {[c.closed_by_name, c.notes].filter(Boolean).join(" · ")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </section>
   );
 }

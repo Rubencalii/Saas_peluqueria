@@ -610,6 +610,18 @@ paths:
         - { name: date, in: query, schema: { type: string, format: date } }
       responses: { "200": { description: "{ total, expected_cash, by_method, appointments[], close }" }, "400": { description: Falta la sede o la fecha es inválida } }
 
+  /api/v1/admin/cash/closes:
+    get:
+      tags: [Panel]
+      summary: Histórico de arqueos de una sede
+      description: "Cierres del rango (por defecto los últimos 30 días), del más reciente al más antiguo, con el descuadre acumulado."
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: location_id, in: query, schema: { type: integer } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses: { "200": { description: "{ closes[], total_difference, days_with_difference }" } }
+
   /api/v1/admin/cash/prepaid:
     patch:
       tags: [Panel]

@@ -94,6 +94,8 @@ DELETE /api/v1/admin/appointments/{id}
 # Caja (recepción y administradores)
 GET    /api/v1/admin/cash/day?location_id=&date=
 POST   /api/v1/admin/cash/close
+GET    /api/v1/admin/cash/closes?location_id=&from=&to=
+PATCH  /api/v1/admin/cash/prepaid
 
 # Clientes
 GET    /api/v1/admin/customers?query=

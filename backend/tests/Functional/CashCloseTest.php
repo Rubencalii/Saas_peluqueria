@@ -185,6 +185,52 @@ final class CashCloseTest extends WebTestCase
         self::assertSame($precio, round((float) $cierre['expected_cash'], 2));
     }
 
+    public function testElHistoricoResumeLosDescuadres(): void
+    {
+        $token = $this->login();
+        $hoy = new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid'));
+        $ayer = $hoy->modify('-1 day')->format('Y-m-d');
+        $anteayer = $hoy->modify('-2 days')->format('Y-m-d');
+
+        // Dos cierres: uno cuadrado y otro al que le faltan 5 €.
+        $this->post('/api/v1/admin/cash/close', $token, ['location_id' => 1, 'date' => $anteayer, 'counted_cash' => 0]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+        // Se fuerza el descuadre en BD: montar 100 € de citas reales solo para
+        // esto no aporta nada al caso que se prueba (el resumen del histórico).
+        $this->db->executeStatement(
+            'UPDATE cash_close SET expected_cash = 100, counted_cash = 95 WHERE location_id = 1 AND business_date = ?',
+            [$anteayer]
+        );
+        $this->post('/api/v1/admin/cash/close', $token, ['location_id' => 1, 'date' => $ayer, 'counted_cash' => 0]);
+        self::assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        $hist = $this->getJson('/api/v1/admin/cash/closes?location_id=1', $token);
+        $fechas = array_column($hist['closes'], 'date');
+        self::assertContains($anteayer, $fechas);
+        self::assertContains($ayer, $fechas);
+        // Más reciente primero.
+        self::assertTrue(array_search($ayer, $fechas, true) < array_search($anteayer, $fechas, true));
+
+        $desc = null;
+        foreach ($hist['closes'] as $c) {
+            if ($c['date'] === $anteayer) {
+                $desc = $c;
+            }
+        }
+        self::assertNotNull($desc);
+        self::assertSame(-5.0, round((float) $desc['difference'], 2));
+        self::assertSame(-5.0, round((float) $hist['total_difference'], 2));
+        self::assertSame(1, (int) $hist['days_with_difference']);
+
+        // Fuera del rango pedido no aparece.
+        $vacio = $this->getJson("/api/v1/admin/cash/closes?location_id=1&from={$hoy->format('Y-m-d')}&to={$hoy->format('Y-m-d')}", $token);
+        self::assertNotContains($anteayer, array_column($vacio['closes'], 'date'));
+
+        // Rango invertido → 400.
+        $this->client->request('GET', "/api/v1/admin/cash/closes?location_id=1&from={$ayer}&to={$anteayer}", server: $this->auth($token));
+        self::assertSame(400, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testValidaFechaFormaDePagoYPermisos(): void
     {
         $token = $this->login();

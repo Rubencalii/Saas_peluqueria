@@ -305,6 +305,14 @@ export interface CashClose {
   closed_by_name: string | null;
 }
 
+export interface CashCloseHistory {
+  from: string;
+  to: string;
+  closes: Array<CashClose & { date: string }>;
+  total_difference: number;
+  days_with_difference: number;
+}
+
 export interface PrepaidSale {
   kind: "gift_card" | "pack";
   id: number;
@@ -638,6 +646,8 @@ export const admin = {
 
   cashDay: (locationId: number, date: string) =>
     adminFetch<CashDay>(`/api/v1/admin/cash/day?location_id=${locationId}&date=${date}`),
+  cashCloses: (locationId: number) =>
+    adminFetch<CashCloseHistory>(`/api/v1/admin/cash/closes?location_id=${locationId}`),
   setPrepaidPayment: (kind: "gift_card" | "pack", id: number, method: PaymentMethod | null) =>
     adminFetch<{ ok: boolean }>("/api/v1/admin/cash/prepaid", {
       method: "PATCH",

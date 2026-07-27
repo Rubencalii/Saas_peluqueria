@@ -107,6 +107,78 @@ final class AdminCashController extends AdminController
     }
 
     /**
+     * Histórico de arqueos de la sede: para ver de un vistazo si los
+     * descuadres son cosa de un día suelto o van a más.
+     */
+    #[Route('/api/v1/admin/cash/closes', name: 'admin_cash_closes', methods: ['GET'])]
+    public function closes(Request $request): JsonResponse
+    {
+        $user = self::user($request);
+        try {
+            $this->auth->assertRole($user, self::ROLES);
+            $requested = $request->query->get('location_id');
+            $locationId = $this->auth->resolveLocation($user, $requested !== null && (int) $requested > 0 ? (int) $requested : null);
+        } catch (AuthException $e) {
+            return $this->error($e->errorCode, $e->getMessage(), $e->statusCode);
+        }
+        if ($locationId === null) {
+            return $this->error('VALIDATION', 'Indica la sede (location_id).', 400);
+        }
+
+        $tzName = $this->db->fetchOne('SELECT timezone FROM location WHERE id = ? AND account_id = ?', [$locationId, $user['account_id']]);
+        if ($tzName === false) {
+            return $this->error('NOT_FOUND', 'Sede no encontrada.', 404);
+        }
+        $tz = new \DateTimeZone((string) $tzName);
+
+        $hoy = new \DateTimeImmutable('now', $tz);
+        $to = $this->parseDate($request->query->get('to'), $tz) ?? $hoy;
+        $from = $this->parseDate($request->query->get('from'), $tz) ?? $to->modify('-29 days');
+        if ($from > $to) {
+            return $this->error('VALIDATION', 'El rango de fechas es inválido (to debe ser >= from).', 400);
+        }
+
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT c.business_date, c.expected_cash, c.counted_cash, c.notes, c.closed_at, u.name AS closed_by_name
+               FROM cash_close c LEFT JOIN app_user u ON u.id = c.closed_by
+              WHERE c.location_id = ? AND c.business_date BETWEEN ? AND ?
+              ORDER BY c.business_date DESC',
+            [$locationId, $from->format('Y-m-d'), $to->format('Y-m-d')]
+        );
+
+        $closes = [];
+        $totalDiff = 0.0;
+        $conDescuadre = 0;
+        foreach ($rows as $r) {
+            $expected = round((float) $r['expected_cash'], 2);
+            $counted = round((float) $r['counted_cash'], 2);
+            $diff = round($counted - $expected, 2);
+            $totalDiff = round($totalDiff + $diff, 2);
+            if (0.0 !== $diff) {
+                ++$conDescuadre;
+            }
+            $closes[] = [
+                'date' => (new \DateTimeImmutable((string) $r['business_date']))->format('Y-m-d'),
+                'expected_cash' => $expected,
+                'counted_cash' => $counted,
+                'difference' => $diff,
+                'notes' => $r['notes'] !== null ? (string) $r['notes'] : null,
+                'closed_at' => (new \DateTimeImmutable((string) $r['closed_at']))->format('c'),
+                'closed_by_name' => $r['closed_by_name'] !== null ? (string) $r['closed_by_name'] : null,
+            ];
+        }
+
+        return $this->json([
+            'location_id' => $locationId,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+            'closes' => $closes,
+            'total_difference' => $totalDiff,
+            'days_with_difference' => $conDescuadre,
+        ]);
+    }
+
+    /**
      * Cambia la forma de pago de un prepago ya vendido (para corregir desde la
      * pantalla de caja). Body: { kind: 'gift_card'|'pack', id, payment_method }
      */
@@ -318,12 +390,22 @@ final class AdminCashController extends AdminController
         $tz = new \DateTimeZone((string) $tzName);
 
         $date = is_string($rawDate) && $rawDate !== '' ? $rawDate : (new \DateTimeImmutable('now', $tz))->format('Y-m-d');
-        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date, $tz);
-        if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
+        if ($this->parseDate($date, $tz) === null) {
             return $this->error('VALIDATION', 'La fecha debe tener el formato AAAA-MM-DD.', 400);
         }
 
         return [$locationId, $date, $tz];
+    }
+
+    /** Fecha AAAA-MM-DD en la zona de la sede, o null si no es válida. */
+    private function parseDate(mixed $raw, \DateTimeZone $tz): ?\DateTimeImmutable
+    {
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+        $d = \DateTimeImmutable::createFromFormat('!Y-m-d', $raw, $tz);
+
+        return $d !== false && $d->format('Y-m-d') === $raw ? $d : null;
     }
 
     /**
