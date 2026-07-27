@@ -11,6 +11,21 @@ function nextMonday(weeksAhead = 0): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Cancela por API las citas de ese teléfono+código. El smoke corre contra la BD
+ * de desarrollo, que no se resetea: sin limpiar, cada ejecución deja huecos
+ * ocupados en el mismo lunes y acaba agotando la agenda del servicio (algunos
+ * los ofrece un solo profesional) haciendo fallar ejecuciones futuras.
+ */
+async function limpiarCitas(page: Page, phone: string, code: string): Promise<void> {
+  const r = await page.request.get(`/api/v1/appointments/lookup?phone=${encodeURIComponent(phone)}&code=${code}`);
+  if (!r.ok()) return;
+  const { appointments } = (await r.json()) as { appointments: Array<{ appointment_id: number }> };
+  for (const a of appointments ?? []) {
+    await page.request.delete(`/api/v1/appointments/${a.appointment_id}?code=${code}`);
+  }
+}
+
 /** Reserva pública completa; devuelve el código de gestión de la cita. */
 async function bookPublicly(page: Page, phone: string): Promise<string> {
   await page.goto("/");
@@ -34,7 +49,9 @@ async function bookPublicly(page: Page, phone: string): Promise<string> {
 }
 
 test("reserva pública de punta a punta", async ({ page }) => {
-  await bookPublicly(page, "+34600" + String(Date.now()).slice(-6));
+  const phone = "+34600" + String(Date.now()).slice(-6);
+  const code = await bookPublicly(page, phone);
+  await limpiarCitas(page, phone, code);
 });
 
 test("mi cita: consultar, reprogramar y cancelar", async ({ page }) => {
@@ -112,10 +129,21 @@ test("alta manual de cita desde el panel", async ({ page }) => {
   const nombre = `Cliente Panel E2E ${stamp}`;
   await form.getByPlaceholder("Nombre del cliente").fill(nombre);
   await form.getByPlaceholder("Teléfono").fill("+34611" + stamp);
-  await form.getByRole("button", { name: "Crear cita" }).click();
 
-  // La cita aparece en el listado del día.
+  const [creada] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/api/v1/admin/appointments") && r.request().method() === "POST"),
+    form.getByRole("button", { name: "Crear cita" }).click(),
+  ]);
+  const { appointment_id: apptId } = (await creada.json()) as { appointment_id: number };
+
+  // La agenda salta al día de la cita y la muestra en el listado.
   await expect(page.getByText(nombre)).toBeVisible({ timeout: 15_000 });
+
+  // Se cancela para no dejar el lunes ocupado (ver limpiarCitas).
+  const token = await page.evaluate(() => window.localStorage.getItem("panel_token"));
+  await page.request.delete(`/api/v1/admin/appointments/${apptId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 });
 
 test("comisiones del profesional: se guardan y persisten", async ({ page }) => {

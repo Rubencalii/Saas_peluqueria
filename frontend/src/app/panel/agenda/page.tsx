@@ -86,17 +86,26 @@ export default function AgendaPage() {
       .catch(() => {});
   }, []);
 
+  // Manda siempre la última petición: al crear una cita para otro día se
+  // dispara una recarga del día viejo y otra del nuevo, y si la vieja llegaba
+  // la última dejaba la agenda en el día equivocado.
+  const requestRef = useRef(0);
+
   const load = useCallback(async () => {
     if (!locationId) return;
+    const req = ++requestRef.current;
     setLoading(true);
     setError(null);
     try {
-      setAgenda(await admin.agenda(locationId, date, view));
+      const data = await admin.agenda(locationId, date, view);
+      if (req !== requestRef.current) return;
+      setAgenda(data);
     } catch {
+      if (req !== requestRef.current) return;
       setError("No se pudo cargar la agenda.");
       setAgenda(null);
     } finally {
-      setLoading(false);
+      if (req === requestRef.current) setLoading(false);
     }
   }, [locationId, date, view]);
 

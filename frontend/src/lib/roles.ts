@@ -24,6 +24,7 @@ export const AREA_ROLES = {
   seguridad: TODOS,
 
   bloqueos: CON_RECEPCION,
+  caja: CON_RECEPCION,
   tarjetas: CON_RECEPCION,
   espera: CON_RECEPCION,
   recurrentes: CON_RECEPCION,

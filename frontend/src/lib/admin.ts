@@ -292,6 +292,39 @@ export interface ReportChannel {
   total: number;
 }
 
+/** Formas de pago de la enum payment_method (migración 0029). */
+export type PaymentMethod = "efectivo" | "tarjeta" | "bono" | "regalo" | "online";
+
+export interface CashClose {
+  expected_cash: number;
+  counted_cash: number;
+  /** contado − esperado: negativo es que falta dinero en el cajón. */
+  difference: number;
+  notes: string | null;
+  closed_at: string;
+  closed_by_name: string | null;
+}
+
+export interface CashDay {
+  location_id: number;
+  date: string;
+  total: number;
+  expected_cash: number;
+  by_method: Record<PaymentMethod | "sin_registrar", { count: number; amount: number }>;
+  appointments: Array<{
+    appointment_id: number;
+    start: string;
+    customer_name: string | null;
+    service_name: string;
+    staff_name: string | null;
+    amount: number;
+    payment_method: PaymentMethod | null;
+  }>;
+  gift_cards_sold: Array<{ code: string; amount: number }>;
+  packs_sold: Array<{ name: string; amount: number }>;
+  close: CashClose | null;
+}
+
 export interface CommissionLine {
   staff_id: number | null;
   staff_name: string | null;
@@ -589,6 +622,17 @@ export const admin = {
 
   setAppointmentNotes: (id: number, notes: string | null) =>
     adminFetch<unknown>(`/api/v1/admin/appointments/${id}`, { method: "PATCH", body: { notes } }),
+
+  setAppointmentPayment: (id: number, method: PaymentMethod | null) =>
+    adminFetch<unknown>(`/api/v1/admin/appointments/${id}`, { method: "PATCH", body: { payment_method: method } }),
+
+  cashDay: (locationId: number, date: string) =>
+    adminFetch<CashDay>(`/api/v1/admin/cash/day?location_id=${locationId}&date=${date}`),
+  closeCash: (locationId: number, date: string, countedCash: number, notes: string | null) =>
+    adminFetch<{ close: CashClose }>("/api/v1/admin/cash/close", {
+      method: "POST",
+      body: { location_id: locationId, date, counted_cash: countedCash, notes },
+    }),
 
   cancelAppointment: (id: number) =>
     adminFetch<unknown>(`/api/v1/admin/appointments/${id}`, { method: "DELETE" }),

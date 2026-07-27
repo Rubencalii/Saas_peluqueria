@@ -91,6 +91,10 @@ POST   /api/v1/admin/appointments            (cita manual/telefónica)
 PATCH  /api/v1/admin/appointments/{id}        (editar, cambiar estado, no_show)
 DELETE /api/v1/admin/appointments/{id}
 
+# Caja (recepción y administradores)
+GET    /api/v1/admin/cash/day?location_id=&date=
+POST   /api/v1/admin/cash/close
+
 # Clientes
 GET    /api/v1/admin/customers?query=
 GET    /api/v1/admin/customers/{id}

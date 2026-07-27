@@ -13,6 +13,7 @@ const NAV: Array<{ href: string; label: string; icon: string; area: PanelArea }>
   { href: "/panel", label: "Inicio", icon: "🏡", area: "inicio" },
   { href: "/panel/agenda", label: "Agenda", icon: "📅", area: "agenda" },
   { href: "/panel/clientes", label: "Clientes", icon: "👥", area: "clientes" },
+  { href: "/panel/caja", label: "Caja", icon: "💶", area: "caja" },
   { href: "/panel/servicios", label: "Servicios", icon: "✂️", area: "servicios" },
   { href: "/panel/bonos", label: "Bonos", icon: "🎟️", area: "bonos" },
   { href: "/panel/tarjetas", label: "Tarjetas regalo", icon: "🎁", area: "tarjetas" },

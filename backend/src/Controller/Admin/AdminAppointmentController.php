@@ -102,9 +102,17 @@ final class AdminAppointmentController extends AdminController
             $sets[] = 'notes = ?';
             $params[] = $payload['notes'] !== null ? (string) $payload['notes'] : null;
         }
+        if (array_key_exists('payment_method', $payload)) {
+            $method = $payload['payment_method'];
+            if ($method !== null && !in_array($method, AdminCashController::METHODS, true)) {
+                return $this->error('VALIDATION', 'Forma de pago inválida.', 400);
+            }
+            $sets[] = 'payment_method = ?';
+            $params[] = $method !== null ? (string) $method : null;
+        }
 
         if ($sets === []) {
-            return $this->error('VALIDATION', 'Nada que actualizar (status y/o notes).', 400);
+            return $this->error('VALIDATION', 'Nada que actualizar (status, notes y/o payment_method).', 400);
         }
 
         $params[] = $id;
@@ -120,6 +128,16 @@ final class AdminAppointmentController extends AdminController
             $this->loyalty->awardForCompletedAppointment($id);
             $this->packs->redeemForAppointment($id);
             $this->notifications->onAppointmentCompleted($id);
+
+            // Si el bono cubrió la sesión, la cita queda cobrada por bono: no
+            // hay dinero que cuadrar en caja y quien cierre no tiene que
+            // acordarse de marcarlo.
+            $this->db->executeStatement(
+                'UPDATE appointment SET payment_method = \'bono\'
+                  WHERE id = ? AND payment_method IS NULL
+                    AND EXISTS (SELECT 1 FROM pack_redemption WHERE appointment_id = ?)',
+                [$id, $id]
+            );
         }
 
         return $this->json($this->detail($id));
@@ -172,7 +190,7 @@ final class AdminAppointmentController extends AdminController
     private function detail(int $id): array
     {
         $r = $this->db->fetchAssociative(
-            'SELECT a.id, a.status, a.channel, a.start_at, a.end_at, a.notes, a.public_code,
+            'SELECT a.id, a.status, a.channel, a.start_at, a.end_at, a.notes, a.public_code, a.payment_method,
                     a.service_id, s.name AS service_name,
                     a.staff_id, st.name AS staff_name,
                     a.customer_id, c.name AS customer_name, c.phone AS customer_phone
@@ -192,6 +210,7 @@ final class AdminAppointmentController extends AdminController
             'end' => (new \DateTimeImmutable($r['end_at']))->format('c'),
             'notes' => $r['notes'] !== null ? (string) $r['notes'] : null,
             'public_code' => $r['public_code'] !== null ? (string) $r['public_code'] : null,
+            'payment_method' => $r['payment_method'] !== null ? (string) $r['payment_method'] : null,
             'service' => ['id' => (int) $r['service_id'], 'name' => (string) $r['service_name']],
             'staff' => $r['staff_id'] !== null
                 ? ['id' => (int) $r['staff_id'], 'name' => (string) $r['staff_name']]

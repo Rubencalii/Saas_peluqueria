@@ -21,13 +21,13 @@ describe("canSee", () => {
     expect(canSee("clientes", "profesional")).toBe(true);
     expect(canSee("seguridad", "profesional")).toBe(true);
 
-    for (const area of ["servicios", "personal", "sedes", "informes", "cuenta", "usuarios"] as PanelArea[]) {
+    for (const area of ["servicios", "personal", "sedes", "informes", "cuenta", "usuarios", "caja"] as PanelArea[]) {
       expect(canSee(area, "profesional"), area).toBe(false);
     }
   });
 
   it("recepción gestiona el mostrador pero no la configuración", () => {
-    for (const area of ["tarjetas", "espera", "recurrentes", "valoraciones", "bloqueos"] as PanelArea[]) {
+    for (const area of ["caja", "tarjetas", "espera", "recurrentes", "valoraciones", "bloqueos"] as PanelArea[]) {
       expect(canSee(area, "recepcion"), area).toBe(true);
     }
     for (const area of ["servicios", "personal", "informes", "bonos"] as PanelArea[]) {

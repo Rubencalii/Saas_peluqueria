@@ -485,11 +485,12 @@ paths:
   /api/v1/admin/appointments/{id}:
     patch:
       tags: [Panel]
-      summary: Editar estado/notas
+      summary: Editar estado/notas/forma de pago
+      description: "Al pasar a completada, si un bono cubrió la sesión la cita queda cobrada como 'bono' automáticamente."
       security: [{ bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       requestBody:
-        content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [pendiente, confirmada, completada, no_show, cancelada] }, notes: { type: [string, "null"] } } } } }
+        content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [pendiente, confirmada, completada, no_show, cancelada] }, notes: { type: [string, "null"] }, payment_method: { type: [string, "null"], enum: [efectivo, tarjeta, bono, regalo, online, null] } } } } }
       responses: { "200": { description: Actualizada }, "404": { $ref: "#/components/responses/Error" } }
     delete:
       tags: [Panel]
@@ -597,6 +598,26 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [location_id], properties: { location_id: { type: integer }, entries: { type: array, items: { type: object, properties: { weekday: { type: integer }, start_time: { type: string }, end_time: { type: string } } } } } } } } }
       responses: { "200": { description: Guardado } }
+
+  /api/v1/admin/cash/day:
+    get:
+      tags: [Panel]
+      summary: Caja del día de una sede
+      description: "Citas completadas con su forma de pago, totales por método, prepagos vendidos (informativos) y el arqueo si ya se cerró. Roles: recepción y administradores."
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: location_id, in: query, schema: { type: integer } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+      responses: { "200": { description: "{ total, expected_cash, by_method, appointments[], close }" }, "400": { description: Falta la sede o la fecha es inválida } }
+
+  /api/v1/admin/cash/close:
+    post:
+      tags: [Panel]
+      summary: Cerrar la caja del día (arqueo)
+      description: "Guarda el efectivo contado frente al esperado. El esperado se recalcula en el servidor; volver a cerrar el mismo día actualiza el arqueo."
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [location_id, date, counted_cash], properties: { location_id: { type: integer }, date: { type: string, format: date }, counted_cash: { type: number, minimum: 0 }, notes: { type: string, nullable: true } } } } } }
+      responses: { "200": { description: "{ close }" }, "400": { description: Falta el efectivo contado } }
 
   /api/v1/admin/staff/{id}/commissions:
     get:
